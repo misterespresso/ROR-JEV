@@ -58,6 +58,7 @@ layer and is the default.
 | [`docs/06-ACTION-REGISTRY.md`](docs/06-ACTION-REGISTRY.md) | Versioned action-record schema — what JEV actually selects, and how gates are declared |
 | [`docs/07-TEST-PLAN.md`](docs/07-TEST-PLAN.md) | The fake-mod suite that gates freezing the protocol, plus the CI consistency checks |
 | [`docs/08-PHASE0-REPORT.md`](docs/08-PHASE0-REPORT.md) | **Phase 0 execution record** — what ran, the measured catalog size and cost model, 22 findings, and what is still blocked |
+| [`docs/10-HANDOFF.md`](docs/10-HANDOFF.md) | **Start here.** State at the end of the last session, open decisions, next steps, known traps |
 | [`docs/09-FORK-BASE.md`](docs/09-FORK-BASE.md) | **Fork-base decision** — why 1.1.1 on BepInEx 5, and the recordings as the fork's regression suite |
 
 Read in order. `01` is evidence, `02` is design, `03` is the brain, `04` is the plan, `05`+`06`
