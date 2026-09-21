@@ -65,16 +65,26 @@ def trace_omit_never_null():
               and o["reason"] == "telemetry_unknown" for o in req2.omitted),
           str(req2.omitted))
 
-    # Granularity of `required_state_fields` decides the blast radius, and it is coarse in
-    # two places. `next_action` and `strategy` declare the whole `threat` block, so ONE
-    # unreadable sub-field omits them too. That is the contract working as written -- no
-    # `unknown` may reach a question that reads it -- and it is deliberately asserted here
-    # rather than treated as a surprise, because the cost is real: one unreadable
-    # feasibility flag also suspends task selection and posture for that tick.
-    check("coarse `threat` declaration omits next_action too",
-          "next_action" not in req2.questions, str(sorted(req2.questions)))
-    check("coarse `threat` declaration omits strategy too",
+    # Granularity of `required_state_fields` decides the blast radius (F4). `next_action` was
+    # narrowed to the three threat parts it uses (F30), so an unreadable feasibility flag no
+    # longer suspends task selection. `strategy` still declares the whole block, and is
+    # still omitted: gating runs on the unstripped state.
+    check("narrowed next_action survives unknown feasibility (F30)",
+          "next_action" in req2.questions, str(req2.omitted))
+    check("coarse `threat` declaration still omits strategy",
           "strategy" not in req2.questions, str(sorted(req2.questions)))
+    check("no `unknown` anywhere in the wire state",
+          "unknown" not in json.dumps(req2.state), json.dumps(req2.state)[:200])
+    check("the unknown sub-field is stripped, its measured siblings are kept",
+          "reposition_feasible" not in req2.state["threat"]
+          and "enemies_near" in req2.state["threat"], str(req2.state["threat"]))
+
+    # A part next_action DOES declare still omits it.
+    blind2 = copy.deepcopy(sc.banded)
+    blind2["threat"]["enemies_near"] = "unknown"
+    req3 = build_request(blind2, reg, BuildContext(CAPS, blind2, False, False), CONTRACT)
+    check("unknown threat.enemies_near -> next_action omitted",
+          "next_action" not in req3.questions, str(sorted(req3.questions)))
     check("a question declaring a PRECISE path survives (threat.enemy_classes)",
           "engage_range" in req2.questions, str(req2.omitted))
     check("no `unknown` ever reaches a question that reads the field",

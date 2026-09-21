@@ -114,6 +114,20 @@ def resolve(state: dict, dotted: str) -> Any:
     return cur
 
 
+def strip_unknown(v: Any) -> Any:
+    """Drop every `unknown` value, at any depth, from the state sent to JEV (F30).
+
+    Gating runs on the UNSTRIPPED state first, so a question declaring a whole block is still
+    omitted when any part of it is unknown. Stripping only stops a narrowly-declared question
+    from being shown fields it never declared and cannot use.
+    """
+    if isinstance(v, dict):
+        return {k: strip_unknown(x) for k, x in v.items() if x != UNKNOWN}
+    if isinstance(v, list):
+        return [strip_unknown(x) for x in v if x != UNKNOWN]
+    return v
+
+
 def _telemetry_ok(fields: list[str], state: dict) -> tuple[bool, list[str]]:
     """A question is sendable only if every field it names is readable.
 
@@ -219,7 +233,7 @@ def build_request(
     """Build one fan-out request. Every question is gated; nothing is sent by default."""
     c = contract or load_contract()
     payload = c["payload"]
-    out = BuiltRequest(state=state, model=c["model"])
+    out = BuiltRequest(state=strip_unknown(state), model=c["model"])
 
     for name, spec in c["questions"].items():
         cond = str(spec.get("enabled_when", "always"))

@@ -130,7 +130,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F1 | Registry cap of 12 unenforced | **fixed** |
 | F2 | `defend_zone` / `fight_boss` unreachable | **fixed** |
 | F3 | Catalog not machine-readable; 5 verbs had no option text | **fixed, text needs review** |
-| F4 | Coarse `required_state_fields` couple questions | documented, deliberate |
+| F4 | Coarse `required_state_fields` couple questions | `next_action` narrowed (F30); `strategy`, `situation_is_novel` still coarse |
 | F5 | C7 cannot run (`jevkit` absent) | open, install away |
 | F6 | Source is 2.0.0; Thunderstore ships 1.1.1 | **resolved** — runtime 1.1.1, clone 2.0.0 |
 | F7 | R2API declared but never used in code | **refined** — install it, it is a manifest dep |
@@ -155,8 +155,8 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F26 | `low_health` is level-triggered: ~60 events/s for as long as HP stays low | open — must be edge-triggered in v2 |
 | F27 | `OBJECTIVE` answers `exploring` in the character-select lobby | fixed in the harness — `INVENTORY`'s marker decides |
 | F28 | **Roam walks off edges in a loop**: detects the cliff, keeps walking, re-picks the same spot | **fixed in fork build 1** — not yet verified in game (`09` §10) |
-| F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **open — a decision: every recording is on an easier game** |
-| F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **open — a contract decision** |
+| F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **decided 2026-09-21: config `BlockRepeatDamage`, default off (vanilla)** — fork build 3, not yet deployed. Recordings before build 3 are on the easier game |
+| F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **decided 2026-09-21: narrowed** to `enemies_near`, `nearest_enemy_band`, `boss_active`; unknowns stripped from the wire state |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1054,6 +1054,11 @@ Whether to keep it is a decision, not a fix: it makes a crude agent survive long
 every result less meaningful. Options are to keep it, to make it a config setting defaulting to off
 (vanilla), or to make it a setting defaulting to on (today's behaviour, now visible).
 
+**Decision (2026-09-21): config setting, default off.** `[Gameplay] BlockRepeatDamage` in
+`justindwang.rainflayer.cfg`, fork build 3. Build 2's environmental-damage note stays above the
+check, so it sees every hit whether or not blocking is on. Runs recorded before build 3 was
+deployed are on the easier game; runs after it are vanilla unless the cfg says otherwise.
+
 ### F30 — `next_action` cannot be sent until the most expensive telemetry exists
 
 An earlier plan said elapsed time plus hazards would unblock `next_action`. Tested against the real
@@ -1082,6 +1087,14 @@ Two ways through:
 
 `build.identity` is separate: nothing derives it yet, and it blocks `strategy` and `engage_range`.
 `02-ARCHITECTURE.md` permits a deterministic derivation from items.
+
+**Decision (2026-09-21): narrow.** `next_action` now declares `threat.enemies_near`,
+`threat.nearest_enemy_band` and `threat.boss_active` (`contract/questions.yaml`).
+`build_request` gates every question on the full state, then sends `strip_unknown(state)`, so
+no `unknown` value reaches JEV, and `strategy` (still declaring all of `threat`) is still omitted
+when any part is unknown. `next_action` still needs `hazards` and `run.time_band`, which only
+build 2's `QUERY_OBSERVATION` supplies. Until the adapter reads it, replays of stock recordings
+still send nothing.
 
 ---
 

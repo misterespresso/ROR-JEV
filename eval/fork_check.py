@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from brain.recorder import Recorder
 from eval import gonogo_probe as gp
-from eval.profile_config import ai_control_enabled
+from eval.profile_config import ai_control_enabled, block_repeat_damage
 from eval.record_run import RunState, drive_loop
 
 
@@ -76,7 +76,8 @@ def main() -> int:
             if not p.accept(a.connect_wait):
                 return 1
             rec.record({"type": "HARNESS_START", "harness": "fork_check/probe",
-                        "ai_control": ai_on, "survivor": a.survivor,
+                        "ai_control": ai_on,
+                        "block_repeat_damage": block_repeat_damage(), "survivor": a.survivor,
                         "difficulty": a.difficulty})
             try:
                 if not gp.wait_for_run(p, a.run_wait):
@@ -118,6 +119,7 @@ def main() -> int:
                         "run_id": a.run_id, "mode": "drive", "poll_hz": 1.0,
                         "decide_every_s": 6.0, "survivor": a.survivor,
                         "difficulty": a.difficulty, "ai_control": ai_on,
+                        "block_repeat_damage": block_repeat_damage(),
                         "note": "fork_check: continues the probe's connection"})
 
             stop = {"flag": False}

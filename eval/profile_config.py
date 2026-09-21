@@ -37,3 +37,29 @@ def ai_control_enabled() -> tuple[bool | None, Path | None]:
             if line.startswith("EnableAIControl"):
                 return line.split("=", 1)[1].strip().lower() == "true", cfg
     return None, None
+
+
+def setting(key: str) -> str | None:
+    """Raw value of one cfg key, or None if the key or the file is absent."""
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    for cfg in Path(appdata).glob(CFG_GLOB):
+        if cfg.name.startswith("._"):
+            continue
+        for line in cfg.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            line = line.strip()
+            if line.startswith(key) and "=" in line and line.split("=", 1)[0].strip() == key:
+                return line.split("=", 1)[1].strip()
+    return None
+
+
+def block_repeat_damage() -> bool | None:
+    """`BlockRepeatDamage` (F29), recorded so every run says which damage model it had.
+
+    None means the key is absent: the cfg predates fork build 3, where the key was added.
+    Builds 0-2 and stock block repeat damage unconditionally, so None is NOT false -- read it
+    against the deployed build. BepInEx writes the key, default false, on build 3's first load.
+    """
+    v = setting("BlockRepeatDamage")
+    return None if v is None else v.lower() == "true"

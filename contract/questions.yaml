@@ -22,8 +22,13 @@ questions:
     type: choice
     dynamic: true                      # options generated from the action registry
     enabled_when: always               # registry is never empty (06 invariant 1)
+    # Narrowed from the whole `threat` block (F4, F30): these are the parts task choice uses, and
+    # stock already measures all three. Unknown sub-fields are stripped from the wire state, so
+    # the `threat` the instructions name is only ever the measured part.
     required_state_fields:
-      - threat
+      - threat.enemies_near
+      - threat.nearest_enemy_band
+      - threat.boss_active
       - hazards
       - economy.gold_band
       - run.time_band

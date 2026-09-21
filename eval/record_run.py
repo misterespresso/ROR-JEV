@@ -48,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brain.recorder import Recorder
 from eval.gonogo_probe import HOST, NON_RUN_SCENES, PORT, QUERIES, Probe, _outcome
 
-from eval.profile_config import ai_control_enabled  # noqa: E402
+from eval.profile_config import ai_control_enabled, block_repeat_damage  # noqa: E402
 
 #: Terminal action events. Same set the probe uses -- see F10/F15: there are two terminal
 #: types and three possible outcome field names.
@@ -398,7 +398,8 @@ def main() -> int:
                         "poll_hz": a.poll_hz, "decide_every_s": a.decide_every,
                         # Human-supplied, because the wire cannot supply it.
                         "survivor": a.survivor, "difficulty": a.difficulty,
-                        "note": a.note, "ai_control": ai_on})
+                        "note": a.note, "ai_control": ai_on,
+                        "block_repeat_damage": block_repeat_damage()})
 
             drive_loop(p, rec, st, observe=a.observe, minutes=a.minutes,
                        poll_hz=a.poll_hz, decide_every=a.decide_every, stop=stop,

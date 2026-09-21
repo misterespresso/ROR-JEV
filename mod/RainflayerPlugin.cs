@@ -27,6 +27,7 @@ namespace Rainflayer
         public static ConfigEntry<bool> DebugMode { get; private set; }
         public static ConfigEntry<bool> RecordWaypoints { get; private set; }
         public static ConfigEntry<bool> PillarSkip { get; private set; }
+        public static ConfigEntry<bool> BlockRepeatDamage { get; private set; }
 
         // Components
         public AIController aiController;  // Made public for SocketBridge access
@@ -87,6 +88,14 @@ namespace Rainflayer
                 "PillarSkip",
                 false,
                 "When true, instantly fully charge all moon battery pillars upon entering the moon2 (Commencement) stage. Use for debugging."
+            );
+
+            // ROR-JEV (F29): stock cancelled repeat hits unconditionally, in human runs too.
+            BlockRepeatDamage = Config.Bind(
+                "Gameplay",
+                "BlockRepeatDamage",
+                false,
+                "When true, cancel damage to the player from an attacker that already hit them within 0.5 s (stock Rainflayer's hidden i-frames). Off = vanilla damage."
             );
         }
 
@@ -262,7 +271,7 @@ namespace Rainflayer
                     Observation.NoteEnvironmentalDamage();
 
                 // I-FRAMES: Check if this damage source recently hit us (prevent contact/AOE spam)
-                if (damageInfo.attacker != null)
+                if (BlockRepeatDamage.Value && damageInfo.attacker != null)
                 {
                     float currentTime = Time.time;
                     float lastDamageTime;
