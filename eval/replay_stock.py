@@ -36,10 +36,13 @@ from eval.label_run import session_label
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def sessions(run_dir: pathlib.Path) -> list[list[dict]]:
-    """Split an appended recording into sessions on HARNESS_START."""
-    out: list[list[dict]] = []
-    path = run_dir / "other.jsonl"
+#: An OBSERVATION older than this when a tick completes is not paired with it. The recorder
+#: polls it about once a second; a stale snapshot would describe a different moment.
+OBS_MAX_AGE_NS = 3_000_000_000
+
+
+def _load(path: pathlib.Path) -> list[tuple[int, dict]]:
+    out = []
     if not path.exists():
         return out
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -47,34 +50,57 @@ def sessions(run_dir: pathlib.Path) -> list[list[dict]]:
             continue
         rec = json.loads(line)
         fr = rec.get("frame")
-        if not isinstance(fr, dict):
-            continue
+        if isinstance(fr, dict):
+            out.append((int(rec.get("_t_recv_wall_ns") or 0), fr))
+    return out
+
+
+def sessions(run_dir: pathlib.Path) -> list[list[tuple[int, dict]]]:
+    """Split an appended recording into sessions on HARNESS_START.
+
+    The recorder writes OBSERVATION frames to their own stream, so they are merged back in by
+    receipt time -- otherwise a build-2+ recording replays as if it had none.
+    """
+    frames = _load(run_dir / "other.jsonl") + _load(run_dir / "observations.jsonl")
+    frames.sort(key=lambda tf: tf[0])          # stable: equal stamps keep file order
+    out: list[list[tuple[int, dict]]] = []
+    for t, fr in frames:
         if fr.get("type") == "HARNESS_START":
             out.append([])
         if out:
-            out[-1].append(fr)
+            out[-1].append((t, fr))
     return out or [[]]
 
 
-def ticks(frames: list[dict]):
+def ticks(frames: list[tuple[int, dict]]):
     """Group stock query responses into ticks.
 
     A tick is completed by the arrival of the LAST query of a sweep. Stock answers six
     separate queries, so a tick assembled this way is already slightly torn -- the exact
     defect the single v2 snapshot exists to remove. Noted rather than hidden.
+
+    Each tick carries the newest OBSERVATION under the key "OBSERVATION", if one arrived
+    within OBS_MAX_AGE_NS of the tick completing.
     """
     cur: dict[str, dict] = {}
-    for fr in frames:
-        t = fr.get("type")
-        if t in {"OBJECTIVE", "INVENTORY", "COMBAT_STATUS", "INTERACTABLES"}:
+    obs: tuple[int, dict] | None = None
+    for t, fr in frames:
+        typ = fr.get("type")
+        if typ == "OBSERVATION":
+            obs = (t, fr)
+            continue
+        if typ in {"OBJECTIVE", "INVENTORY", "COMBAT_STATUS", "INTERACTABLES"}:
             # Stock marks a degraded response with `note` ("Not in game"). Replaying those
             # as real observations counts menu and loading time as gameplay.
             if fr.get("note"):
                 cur.clear()
                 continue
-            cur[t] = fr
+            cur[typ] = fr
             if len(cur) == 4:
-                yield dict(cur)
+                tick = dict(cur)
+                if obs and t - obs[0] <= OBS_MAX_AGE_NS:
+                    tick["OBSERVATION"] = obs[1]
+                yield tick
                 cur = {}
 
 
@@ -126,6 +152,7 @@ def main() -> int:
     unmapped = Counter()
     errors: list[str] = []
     verbs_offered = Counter()
+    with_obs = 0
 
     for tick in ticks(frames):
         n += 1
@@ -133,7 +160,10 @@ def main() -> int:
             break
         ad = adapt(tick.get("OBJECTIVE", {}), tick.get("INVENTORY", {}),
                    tick.get("COMBAT_STATUS", {}), tick.get("INTERACTABLES", {}),
-                   observation_id=f"obs-{n}", seq=n)
+                   observation_id=f"obs-{n}", seq=n,
+                   observation=tick.get("OBSERVATION"))
+        if "OBSERVATION" in tick:
+            with_obs += 1
         for u in ad.unmapped:
             unmapped[u] += 1
         phases[ad.banded["objective"]["phase"]] += 1
@@ -162,6 +192,7 @@ def main() -> int:
 
     print("-" * 78)
     print(f"TICKS REPLAYED: {n}")
+    print(f"  with a fresh OBSERVATION (build 2+): {with_obs}")
     print("-" * 78)
     print("objective phases seen:")
     for p, c in phases.most_common():

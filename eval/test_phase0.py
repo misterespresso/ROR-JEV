@@ -514,6 +514,99 @@ def trace_string_coercion():
           num("9") < num("30") and "9" > "30")
 
 
+def _obs(**over):
+    o = {"type": "OBSERVATION", "v": 1, "in_run": True,
+         "run": {"survivor": "CommandoBody", "difficulty": "Easy",
+                 "difficulty_coefficient": 1.1, "elapsed_s": 125.4,
+                 "stage_clear_count": 0, "scene": "blackbeach2"},
+         "self": {"hp": 143, "hp_max": 143, "shield": 0, "shield_max": 0,
+                  "barrier": 0, "alive": True},
+         "hazards": {"taking_environmental_damage": False,
+                     "environmental_damage_age_s": None, "active_dots": [],
+                     "hostile_projectiles_nearby": 0, "hostile_projectiles_radius_m": 15,
+                     "in_hazard_volume": False, "in_hazard_volume_covers": "void_fog"}}
+    for path, v in over.items():
+        blk, key = path.split("__")
+        o[blk][key] = v
+    return o
+
+
+def trace_adapter_reads_observation():
+    print("\nBuild 2: QUERY_OBSERVATION fills run, self and hazards; nothing is invented")
+    stock = ({"objective": "exploring", "boss_active": False, "scene_name": "blackbeach2"},
+             {"money": 15, "items": []}, {"enemy_count": 0, "nearest_enemy_distance": 999.0},
+             {"interactables": []})
+
+    def banded(obs):
+        return adapt(*stock, observation_id="o", seq=1, observation=obs).banded
+
+    b = banded(_obs())
+    check("survivor loses the Body suffix", b["run"]["survivor"] == "Commando")
+    check("DifficultyIndex `Easy` becomes Drizzle", b["run"]["difficulty"] == "Drizzle")
+    check("2 min in is `plenty`", b["run"]["time_band"] == "plenty")
+    check("full hp is `healthy`", b["self"]["hp_band"] == "healthy")
+    check("hp_trend stays unknown (needs history)", b["self"]["hp_trend"] == UNKNOWN)
+    check("difficulty_band stays unknown (no cut points)",
+          b["run"]["difficulty_band"] == UNKNOWN)
+    check("hazards become a measured block",
+          b["hazards"] == {"taking_environmental_damage": False, "active_dots": [],
+                           "projectiles_near": "none", "in_void_fog": False}, str(b["hazards"]))
+
+    check("25 min in is `pressing`",
+          banded(_obs(run__elapsed_s=1500))["run"]["time_band"] == "pressing")
+    check("29% combined health is `low` (the mod's 0.30)",
+          banded(_obs(self__hp=41.4))["self"]["hp_band"] == "low")
+    check("shield counts toward combined health",
+          banded(_obs(self__hp=50, self__shield=100, self__shield_max=100))
+          ["self"]["hp_band"] == "hurt")
+    check("overkill hp with alive:false is `dead`, not a negative fraction (fork-06)",
+          banded(_obs(self__hp=-31.2, self__alive=False))["self"]["hp_band"] == "dead")
+    check("3 projectiles within the radius is `many`",
+          banded(_obs(hazards__hostile_projectiles_nearby=3))["hazards"]["projectiles_near"]
+          == "many")
+
+    # Honesty: `in_void_fog` is only a fact if the mod says that is what it covers.
+    b2 = banded(_obs(hazards__in_hazard_volume_covers="something_else"))
+    check("unrecognised hazard-volume coverage stays unknown",
+          b2["hazards"]["in_void_fog"] == UNKNOWN)
+
+    for label, obs in [("no frame", None), ("in_run false", {"type": "OBSERVATION",
+                                                               "in_run": False})]:
+        b3 = banded(obs)
+        check(f"{label}: hp, time and hazards stay unknown",
+              b3["hazards"] == UNKNOWN and b3["self"]["hp_band"] == UNKNOWN
+              and b3["run"]["time_band"] == UNKNOWN)
+
+    ad = adapt(*stock, observation_id="o", seq=1, observation=_obs())
+    reg = build_registry(ad.raw, set(CAPS), False)
+    req = build_request(ad.banded, reg, BuildContext(CAPS, ad.banded, False, False), CONTRACT)
+    check("with an observation, next_action is sendable on stock + build 2 (F30)",
+          "next_action" in req.questions, str(req.omitted))
+    check("and no `unknown` is on the wire", "unknown" not in json.dumps(req.wire()))
+
+
+def trace_replay_pairs_observations():
+    print("\nReplay: OBSERVATION frames from their own stream are paired with ticks")
+    from eval.replay_stock import OBS_MAX_AGE_NS, sessions, ticks
+    sweep = [{"type": "OBJECTIVE", "objective": "exploring"}, {"type": "INVENTORY", "money": 0},
+             {"type": "COMBAT_STATUS", "enemy_count": 0}, {"type": "INTERACTABLES",
+                                                           "interactables": []}]
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        other = [(0, {"type": "HARNESS_START"})]
+        other += [(10 + i, f) for i, f in enumerate(sweep)]                  # tick 1: fresh
+        late = 10 + OBS_MAX_AGE_NS + 100
+        other += [(late + i, f) for i, f in enumerate(sweep)]                # tick 2: stale
+        obs = [(5, {"type": "OBSERVATION", "seq": 1, "in_run": True})]
+        for name, rows in (("other.jsonl", other), ("observations.jsonl", obs)):
+            (d / name).write_text("".join(json.dumps({"_t_recv_wall_ns": t, "frame": f}) + "\n"
+                                          for t, f in rows), encoding="utf-8")
+        tk = list(ticks(sessions(d)[-1]))
+    check("two ticks assembled", len(tk) == 2, str(len(tk)))
+    check("a fresh observation rides with its tick", tk and "OBSERVATION" in tk[0])
+    check("a stale one does not", len(tk) == 2 and "OBSERVATION" not in tk[1])
+
+
 def trace_adapter_on_real_recording():
     print("\nReplay: real recorded frames through the real registry")
     rec = Path(__file__).resolve().parents[1] / "recordings" / "human-01"
@@ -559,6 +652,7 @@ TRACES = [
     trace_f1_cap_and_ranking,
     trace_teleporter_classification, trace_shrine_classification,
     trace_adapter_refuses_to_invent, trace_string_coercion,
+    trace_adapter_reads_observation, trace_replay_pairs_observations,
     trace_adapter_on_real_recording,
 ]
 

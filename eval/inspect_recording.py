@@ -72,10 +72,23 @@ STOCK_SOURCE: dict[str, str | None] = {
     "run.survivor":                    None,
     "run.time_band":                   None,   # no elapsed-time field anywhere
     "threat":                          "partial: COMBAT_STATUS + OBJECTIVE.boss_active",
+    "threat.enemies_near":             "COMBAT_STATUS.enemy_count",
+    "threat.nearest_enemy_band":       "COMBAT_STATUS.nearest_enemy_distance",
+    "threat.boss_active":              "OBJECTIVE.boss_active",
     "threat.enemy_classes":            None,   # no per-enemy list at all
     "threat.reposition_feasible":      None,   # needs the pathfinder
     "threat.full_withdrawal_feasible": None,
     "hazards":                         None,   # no environmental/DoT/projectile facts
+}
+
+
+#: What fork build 2's QUERY_OBSERVATION adds, applied only when the recording actually
+#: contains OBSERVATION frames -- a stock recording must not be credited with them.
+OBSERVATION_SOURCE: dict[str, str] = {
+    "self.hp_band":  "OBSERVATION.self (build 2+)",
+    "run.survivor":  "OBSERVATION.run.survivor (build 2+)",
+    "run.time_band": "OBSERVATION.run.elapsed_s (build 2+)",
+    "hazards":       "OBSERVATION.hazards (build 2+)",
 }
 
 
@@ -295,6 +308,9 @@ def main() -> int:
     # declares is unknown (brain/catalog.py `_telemetry_ok`), so a partially sourced block is
     # as blocking as a missing one. Counting partial as present is what produced a wrong claim
     # that time + hazards alone would unblock `next_action` -- `threat` was "partial".
+    if schema.counts.get("OBSERVATION"):
+        STOCK_SOURCE.update(OBSERVATION_SOURCE)
+
     def available(f):
         src = STOCK_SOURCE.get(f)
         return bool(src) and not str(src).startswith("partial")

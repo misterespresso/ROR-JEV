@@ -32,6 +32,13 @@ def run(script: str) -> tuple[int, int, str]:
     if "passed" in tail:
         parts = tail.replace(",", "").split()
         passed, failed = int(parts[0]), int(parts[2])
+    # A script that crashes prints no summary line, and used to read as "0 passed, 0 failed"
+    # -- a PASS. A crash, or a non-zero exit with no failure counted, is one failure.
+    if r.returncode != 0 and failed == 0 or "passed" not in tail:
+        failed = max(failed, 1)
+        err = r.stderr.strip().splitlines()
+        return passed, failed, r.stdout + "\nFAIL (crashed): " + (err[-1] if err else
+                                                                  f"exit {r.returncode}")
     return passed, failed, r.stdout
 
 
@@ -70,9 +77,10 @@ def main() -> int:
     print("  [NOT IMPLEMENTED]  0 passed, 0 failed, "
           f"{len(INGAME_OWED)} traces owed")
     print(f"      owed: {', '.join(INGAME_OWED)}")
-    print("      blocker: the fork (mod/, builds 0-2) implements no protocol v2 yet, and")
-    print("      builds 1-2 are unverified in game. Phase 0's go/no-go PASSED against STOCK")
-    print("      1.1.1 (recordings/gonogo-03 opened a chest end to end), which proves the")
+    print("      blocker: the fork (mod/, builds 0-3) implements no protocol v2 yet;")
+    print("      builds 1-2 are verified in game, build 3 is not. Phase 0's go/no-go")
+    print("      PASSED against STOCK 1.1.1 (recordings/gonogo-03 opened a chest end to")
+    print("      end), which proves the")
     print("      game and mod stack work -- not that protocol v2's typed targets,")
     print("      lifecycle and token rules behave correctly under Unity.")
     print()
@@ -95,7 +103,7 @@ def main() -> int:
           "that is evidence")
     print("                    about STOCK Rainflayer 1.1.1. No protocol v2 conformance "
           "has run in")
-    print("                    game: the fork exists (builds 0-2) but does not speak v2 "
+    print("                    game: the fork exists (builds 0-3) but does not speak v2 "
           "yet.")
     print("=" * 72)
     return 1 if total_f or gen.returncode else 0

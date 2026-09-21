@@ -154,9 +154,11 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F25 | **A terminal event is not guaranteed**: a teleporter was activated and no `action_complete` came | open — deadlines in v2 are mandatory, not defensive |
 | F26 | `low_health` is level-triggered: ~60 events/s for as long as HP stays low | open — must be edge-triggered in v2 |
 | F27 | `OBJECTIVE` answers `exploring` in the character-select lobby | fixed in the harness — `INVENTORY`'s marker decides |
-| F28 | **Roam walks off edges in a loop**: detects the cliff, keeps walking, re-picks the same spot | **fixed in fork build 1** — not yet verified in game (`09` §10) |
-| F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **decided 2026-09-21: config `BlockRepeatDamage`, default off (vanilla)** — fork build 3, not yet deployed. Recordings before build 3 are on the easier game |
+| F28 | **Roam walks off edges in a loop**: detects the cliff, keeps walking, re-picks the same spot | **fixed in fork build 1** — verified in game, fork-06 (`09` §10) |
+| F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **decided 2026-09-21: config `BlockRepeatDamage`, default off (vanilla)** — fork build 3, deployed. Recordings before build 3 are on the easier game |
 | F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **decided 2026-09-21: narrowed** to `enemies_near`, `nearest_enemy_band`, `boss_active`; unknowns stripped from the wire state |
+| F31 | **`run_suite` reported a crashing test file as PASS** (0 passed, 0 failed) | **fixed** — a crash or a non-zero exit is now a failure |
+| F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | open — needs an `enabled_when` or lifecycle gate |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1095,6 +1097,24 @@ no `unknown` value reaches JEV, and `strategy` (still declaring all of `threat`)
 when any part is unknown. `next_action` still needs `hazards` and `run.time_band`, which only
 build 2's `QUERY_OBSERVATION` supplies. Until the adapter reads it, replays of stock recordings
 still send nothing.
+
+
+### F31 — The suite could report a crash as a pass
+
+`eval/run_suite.py` read each test script's last stdout line for its counts. A script that dies
+before printing one — a syntax error, an import error — produced no counts and was reported as
+`[PASS] 0 passed, 0 failed`. Found when an edit to `eval/test_phase0.py` broke its syntax and the
+suite total quietly fell from 232 to 81 while the disposition still read green. Now a missing
+summary line or a non-zero exit with no counted failure is one failure, with stderr's last line
+printed. Verified with a deliberately crashing script.
+
+### F32 — JEV would be asked what a dead character should do next
+
+With build 2's observation, `self.hp_band` can be `dead`, and `next_action` does not declare
+`self.hp_band` — so on fork-06's three post-death ticks `next_action` was sendable. Nothing is
+executed on a dead character, but the call costs tokens and records a decision about nothing.
+The fix is a gate, not a declaration: `enabled_when` on `alive`, or the lifecycle suspending the
+tick loop at death.
 
 ---
 

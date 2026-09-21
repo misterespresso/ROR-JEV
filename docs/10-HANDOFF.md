@@ -10,8 +10,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 |---|---|
 | Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
-| Brain | contract implemented; **232 tests passing** (`python -m eval.run_suite`) |
-| Brain on real telemetry | 10,578 replayed ticks, registry invariants held on every one — and **zero questions sendable** (F18, F30) |
+| Brain | contract implemented; **252 tests passing** (`python -m eval.run_suite`) |
+| Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 447/448 ticks**; the rest still blocked on `build.identity` and feasibility |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
 | Deployed | **build 3** `AA63B6D3…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
@@ -74,13 +74,19 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
    with a **different hash** from `CE424B48…`, because build 1 was compiled from CRLF sources
    (`contract/pinned-build.yaml`, `builds:`). Confirm with `compare_dll` rather than the hash,
    register the new hash as "build 1, LF rebuild", deploy, then return `mod/` to `master`.
-2. **Adapter: consume `QUERY_OBSERVATION`** in `brain/stock_adapter.py` — band `elapsed_s` →
-   `run.time_band`, `hp/hp_max` → `self.hp_band`, fill `run.survivor` and `hazards`. Not done yet;
-   the recorder already polls and records the query. With it, `next_action` becomes
-   sendable on real telemetry for the first time — replay a recording to prove it.
-3. `build.identity`: nothing derives it; it blocks `strategy`, `engage_range` and every worth
+2. **Adapter: done.** `brain/stock_adapter.py` `from_observation` bands build 2's frame into
+   `run` (survivor, difficulty, `time_band`), `self` (`hp_band`, `barrier_band`) and `hazards`;
+   `replay_stock` merges `observations.jsonl` back in by receipt time (≤ 3 s stale).
+   `python -m eval.replay_stock --run-id fork-06`: **`next_action` sendable on 447/448 ticks**,
+   no `unknown` on the wire. The band cut points are **provisional** — `TIME_BANDS_MIN`
+   (10 / 25 min) and `HP_BANDS` (0.70 / 0.30, the latter matching the mod's low-health logic);
+   no doc defines them, so review them. Hazard fields are named for what the mod measures:
+   `in_void_fog`, not `in_hazard_volume`, and `projectiles_near`, not `incoming_projectiles`.
+   Open: F32, `next_action` still sent while dead.
+3. **F32:** gate `next_action` off when `self.hp_band` is `dead`. Small.
+4. `build.identity`: nothing derives it; it blocks `strategy`, `engage_range` and every worth
    gate. `02-ARCHITECTURE.md` permits a deterministic derivation from items.
-4. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+5. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 

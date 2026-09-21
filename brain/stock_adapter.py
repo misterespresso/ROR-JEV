@@ -37,7 +37,11 @@ ADAPTER_ASSUMPTIONS = [
     "shrine subtype comes from the display name; the mod's bare `Shrine` fallback maps "
     "to nothing rather than being guessed at (F21)",
     "cost fields are trusted as sent, though shrine cost=1 looks like a placeholder",
-    "no hazards, feasibility, hp, survivor, elapsed time or nav progress exist at all (F18)",
+    "hp, survivor, elapsed time and hazards come from QUERY_OBSERVATION (fork build 2+) "
+    "when the recording has it, and are unknown otherwise; feasibility and nav progress "
+    "exist nowhere (F18)",
+    "time_band and hp_band thresholds are provisional (TIME_BANDS_MIN, HP_BANDS); no doc "
+    "defines them",
 ]
 
 #: Metres within which an interaction is assumed possible. RoR2's real interaction range is
@@ -53,6 +57,91 @@ USES_NOT_APPLICABLE = -1
 #: Hidden items the game inserts that no player picked up (F13). Excluded before anything
 #: derives a build identity from the inventory.
 HIDDEN_ITEMS = {"DrizzlePlayerHelper", "MonsoonPlayerHelper"}
+
+#: `Run.selectedDifficulty.ToString()` is the DifficultyIndex enum name, not the display name.
+DIFFICULTY_NAMES = {"Easy": "Drizzle", "Normal": "Rainstorm", "Hard": "Monsoon"}
+
+#: PROVISIONAL. Run minutes at which `run.time_band` steps up. RoR2's difficulty climbs with
+#: run time, so time spent is the pressure `next_action` weighs; the cut points are a first
+#: guess, not a measurement. Upper bound exclusive; the last band is open-ended.
+TIME_BANDS_MIN = [(10.0, "plenty"), (25.0, "moderate"), (float("inf"), "pressing")]
+
+#: PROVISIONAL. Fraction of combined health (hp + shield over their maxima) at or above which
+#: each band applies. `low` starts at 0.30, where the mod's own low-health logic starts
+#: (AIController.cs), so the brain and the mod agree on what "low" means.
+HP_BANDS = [(0.70, "healthy"), (0.30, "hurt"), (0.0, "low")]
+
+
+def _time_band(elapsed_s) -> str:
+    e = num(elapsed_s)
+    if e is None or e < 0:
+        return UNKNOWN
+    for upper, band in TIME_BANDS_MIN:
+        if e / 60.0 < upper:
+            return band
+    return UNKNOWN
+
+
+def _hp_band(slf: dict) -> str:
+    if slf.get("alive") is False:
+        return "dead"
+    hp, hp_max = num(slf.get("hp")), num(slf.get("hp_max"))
+    if hp is None or not hp_max:
+        return UNKNOWN
+    # hp goes negative on the killing blow (fork-06: -31.2); clamp so it cannot band oddly.
+    frac = (max(hp, 0) + max(num(slf.get("shield"), 0), 0)) / (
+        hp_max + max(num(slf.get("shield_max"), 0), 0))
+    for floor, band in HP_BANDS:
+        if frac >= floor:
+            return band
+    return UNKNOWN
+
+
+def _projectiles_band(n) -> str:
+    n = num(n)
+    if n is None:
+        return UNKNOWN
+    return "none" if n <= 0 else "few" if n <= 2 else "many"
+
+
+def from_observation(obs: dict | None) -> dict | None:
+    """Band one build-2 `OBSERVATION` frame into `run`, `self` and `hazards` parts.
+
+    Returns None when there is nothing to use (no frame, or `in_run: false`), so the caller
+    keeps its `unknown`s. Field names say what the mod measures, not what the protocol
+    doc hoped for: the mod reports void fog only, so the fact is `in_void_fog`, not a
+    general `in_hazard_volume` that would read `false` while standing in lava; and it counts
+    hostile projectiles within a radius, not ones known to be incoming.
+    """
+    if not obs or obs.get("type") != "OBSERVATION" or not obs.get("in_run"):
+        return None
+    run, slf, hz = obs.get("run") or {}, obs.get("self") or {}, obs.get("hazards") or {}
+
+    survivor = str(run.get("survivor") or "")
+    survivor = survivor[:-4] if survivor.endswith("Body") else survivor
+    diff = run.get("difficulty")
+    barrier = num(slf.get("barrier"))
+    covers = hz.get("in_hazard_volume_covers")
+
+    hazards = {
+        "taking_environmental_damage": bool(hz["taking_environmental_damage"])
+        if "taking_environmental_damage" in hz else UNKNOWN,
+        "active_dots": list(hz["active_dots"]) if isinstance(hz.get("active_dots"), list)
+        else UNKNOWN,
+        "projectiles_near": _projectiles_band(hz.get("hostile_projectiles_nearby")),
+        # Only claim what the mod says it covers.
+        "in_void_fog": bool(hz.get("in_hazard_volume")) if covers == "void_fog" else UNKNOWN,
+    }
+    return {
+        "run": {"survivor": survivor or UNKNOWN,
+                "difficulty": DIFFICULTY_NAMES.get(str(diff), str(diff)) if diff else UNKNOWN,
+                "time_band": _time_band(run.get("elapsed_s"))},
+        "self": {"hp_band": _hp_band(slf),
+                 "barrier_band": UNKNOWN if barrier is None
+                 else ("none" if barrier <= 0 else "some")},
+        "hazards": hazards,
+    }
+
 
 #: stock `objective` -> our `objective.phase`
 PHASE_MAP = {
@@ -176,7 +265,8 @@ def _nearest_band(d: float | None) -> str:
 
 def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
           *, observation_id: str, seq: int,
-          range_m: float = INTERACTION_RANGE_M) -> Adapted:
+          range_m: float = INTERACTION_RANGE_M,
+          observation: dict | None = None) -> Adapted:
     """Build one observation from a matched set of stock query responses.
 
     The caller is responsible for the responses describing roughly the same instant. They
@@ -267,4 +357,14 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                     "consecutive_failures": 0, "last_latency_band": UNKNOWN},
         "advisor": None,
     }
+
+    # Build 2+: QUERY_OBSERVATION fills what stock cannot. Anything it does not measure stays
+    # `unknown` (hp_trend needs history; difficulty_band has no defined cut points).
+    ob = from_observation(observation)
+    if ob:
+        out.banded["run"].update(ob["run"])
+        out.banded["self"].update(ob["self"])
+        out.banded["hazards"] = ob["hazards"]
+        out.raw.update({k: observation[k] for k in ("run", "self", "hazards")
+                        if k in observation})
     return out
