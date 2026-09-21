@@ -789,6 +789,23 @@ namespace Rainflayer
             // If obstacle or cliff, pick new waypoint
             if (obstacleAhead || !groundAhead)
             {
+                // ROR-JEV fix 1 (edge loop): actually STOP. RainflayerPlugin's input override
+                // saves and restores inputBank.moveVector every frame, so a branch that sets no
+                // movement leaves last frame's "walk toward the edge" in force -- the character
+                // detected the cliff and kept walking off it.
+                body.inputBank.moveVector = Vector3.zero;
+
+                // ROR-JEV fix 2 (edge loop): exploration scoring prefers unvisited positions,
+                // and a waypoint beyond an edge can never be visited, so it stayed the most
+                // attractive choice forever -- fall, respawn nearby, choose it again. Marking
+                // the abandoned waypoint as visited makes it the LEAST attractive instead.
+                if (roamWaypoint.HasValue)
+                {
+                    visitedPositions.Add(roamWaypoint.Value);
+                    if (visitedPositions.Count > 50)
+                        visitedPositions.RemoveAt(0);
+                }
+
                 roamWaypoint = null; // Force new waypoint selection next frame
             }
             else if (distanceToWaypoint > 1f)
