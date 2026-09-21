@@ -10,10 +10,10 @@ and started the fork, written so the next session does not re-derive any of it. 
 |---|---|
 | Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
-| Brain | contract implemented; **264 tests passing** (`python -m eval.run_suite`) |
+| Brain | contract implemented; **277 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 3** `AA63B6D3…` (`python tools/deploy.py --status`) |
+| Deployed | **build 4** `48A5B4A4…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -24,7 +24,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 1 | roam no longer walks off edges (F28) | **yes** — fork-06, stayed on the ground in combat too (user observed) |
 | 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **yes** — fork-06, 516 frames, every check below passes |
 
-| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | deployed `AA63B6D3…` from `36faf23`; loads (cfg key written), no run recorded yet |
+| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | loads (cfg key written); superseded by build 4 before a run was recorded |
+| 4 | `OBSERVATION` gains a `threat` block: enemy/elite/boss/targeting counts within 50 m, 16 nearest with body, team, elite, boss, flying, distance, targeting | **deployed** `48A5B4A4…` from `b0e03a2`; **not yet run** |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -50,7 +51,7 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
 ## Next steps, in order
 
 1. **Build 3 launched: done.** The cfg gained `BlockRepeatDamage = false` under `[Gameplay]`.
-   Still to see: a build-3 recording whose `HARNESS_START` says `"block_repeat_damage": false`.
+   The first build-4 run (step 5) also confirms F29 on the wire.
    The OBSERVATION checks below apply to every later run.
 
    "Sane" means, for frames with `in_run: true`:
@@ -91,10 +92,24 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
    doc defines them. Effect on fork-06: `worth_start_teleporter` sendable on the 6 ticks the
    teleporter is offered, the first worth gate ever sendable. `strategy` and `engage_range` are
    still blocked, now only on `threat` sub-fields (elite, enemy classes, focus, feasibility).
-5. **Next telemetry: `threat` sub-fields** — `elite_present`, `enemy_classes`, `being_focused`
-   are one mod pass over nearby enemies and unblock `engage_range` (with `run.survivor`); feasibility
-   is the expensive one and gates `strategy` and `engagement_response`.
-6. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+5. **Threat telemetry: built, deployed as build 4, not yet run.** The mod sends raw facts
+   (`mod/Observation.cs` `Threat`); `brain/enemy_class.py` bands them: `elite_present` from the
+   elite count, `enemy_classes` from a provisional body-name table (`is_boss` wins; `unknown` if
+   unrecognised bodies outnumber recognised ones), `being_focused` at ≥ 3 AIs targeting the
+   player. **Review the body table and `FOCUS_MIN`.** Expected once recorded: `engage_range`
+   sendable. `strategy` and `engagement_response` still need path feasibility.
+
+   **Verify with a run** (game closed → AI control on → main menu):
+   `python -m eval.fork_check --run-id fork-07 --survivor Commando --difficulty Drizzle`, then
+   `python -m eval.replay_stock --run-id fork-07` (expect `engage_range` sent) and
+   `python -m eval.inspect_recording --run-id fork-07`. Check: `HARNESS_START` has
+   `"block_repeat_damage": false`; `threat.enemy_count` roughly matches stock `enemy_count`
+   (stock also counts dead bodies, so it can be higher); `targeting_player_count` rises in a
+   fight; every body name in the run is in `BODIES` (unlisted ones show as unclassified).
+   Raw `threat.enemies` in the adapter stays empty: no entity IDs, so `fight_boss` still cannot
+   target them (F17).
+6. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.
+7. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 
