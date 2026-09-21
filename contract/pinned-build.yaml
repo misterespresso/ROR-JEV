@@ -94,6 +94,7 @@ rainflayer:
     builds:                           # every deployed build; mod/deploys.log has timestamps
       - {build: 0, sha256_debug: C9E558B8671FA35CC353E08F433CD8DA8ECB47ED0EFC2605E32DE9BE4ABA7FC4, change: "none -- IL-identical to stock"}
       - {build: 1, sha256_debug: CE424B481B26F5BC745750BCDC19B1BC97DEACB653079DDBBFC7D93AA0176794, change: "roam edge loop: stop at edges, mark abandoned waypoint visited", methods_changed: ["CombatController::ApplyIdleBehavior"], verified_in_game: false}
+      - {build: 2, sha256_debug: 1C9DD2808A6A50F59837B7836227510D0E16FF96FEC9A1686A3CAAA6612B96DA, change: "QUERY_OBSERVATION: run time/difficulty/survivor, player health, four hazard facts, one main-thread pass", methods_changed: ["SocketBridge::RegisterQueryHandlers", "RainflayerPlugin::HealthComponent_TakeDamage"], methods_added: "Observation (new type), SocketBridge::HandleQueryObservation", verified_in_game: false}
     runtime_verified:                 # fork-gonogo-01 / fork-01, 2026-09-21
       loaded_as: "Rainflayer 1.1.1"   # BepInEx log; stock would read 1.1.0
       hooks_bound: 4 of 4

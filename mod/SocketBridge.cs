@@ -118,6 +118,8 @@ namespace Rainflayer
             queryHandlers["QUERY_INTERACTABLES"] = HandleQueryInteractables;
             queryHandlers["QUERY_ALLIES"] = HandleQueryAllies;
             queryHandlers["QUERY_PILLARS"] = HandleQueryPillars;
+            // ROR-JEV: protocol v2's first snapshot fields (Observation.cs)
+            queryHandlers["QUERY_OBSERVATION"] = HandleQueryObservation;
 
             // Command handlers (execute via AIController, return status via socket)
             queryHandlers["COMMAND"] = HandleCommand;
@@ -392,6 +394,19 @@ namespace Rainflayer
             catch (Exception e)
             {
                 SendResponse("{\"type\": \"INVENTORY\", \"money\": 0, \"equipment\": \"None\", \"items\": [], \"error\": \"" + EscapeJson(e.Message) + "\"}");
+            }
+        }
+
+        /// <summary>ROR-JEV: single main-thread snapshot; see Observation.cs.</summary>
+        public void HandleQueryObservation(string queryJson = null)
+        {
+            try
+            {
+                SendResponse(Observation.Build(RainflayerPlugin.GetPlayerBody()));
+            }
+            catch (Exception e)
+            {
+                SendError("QUERY_OBSERVATION failed: " + e.Message);
             }
         }
 

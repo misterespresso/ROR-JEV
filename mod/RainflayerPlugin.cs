@@ -257,6 +257,10 @@ namespace Rainflayer
             // Check if the player is taking damage
             if (self.body == LocalPlayerMaster?.GetBody())
             {
+                // ROR-JEV: damage with no character behind it is environmental (Observation.cs).
+                if (damageInfo.attacker == null || damageInfo.attacker.GetComponent<CharacterBody>() == null)
+                    Observation.NoteEnvironmentalDamage();
+
                 // I-FRAMES: Check if this damage source recently hit us (prevent contact/AOE spam)
                 if (damageInfo.attacker != null)
                 {
