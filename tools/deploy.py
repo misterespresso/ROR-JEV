@@ -59,10 +59,28 @@ def describe(h: str) -> str:
     return KNOWN_BUILDS.get(h, "fork build (unregistered -- add it to KNOWN_BUILDS)")
 
 
+def source_revision() -> str:
+    """The commit the build came from, plus '+dirty' for uncommitted changes under mod/.
+
+    Recorded here rather than stamped into the DLL: the SDK's own stamping made the DLL hash
+    change on every commit (see mod/Rainflayer.csproj), which broke 'same code, same hash'.
+    """
+    import subprocess
+    try:
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                              capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "mod"], cwd=ROOT,
+                               capture_output=True, text=True).stdout.strip()
+        return head + ("+dirty" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "no-git"
+
+
 def log(action: str, h: str) -> None:
     LOG.parent.mkdir(parents=True, exist_ok=True)
     with LOG.open("a", encoding="utf-8") as f:
-        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')}  {action:<8} {h}  {describe(h)}\n")
+        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')}  {action:<8} {h}  "
+                f"src={source_revision():<16} {describe(h)}\n")
 
 
 def copy(src: pathlib.Path, dst: pathlib.Path) -> None:
