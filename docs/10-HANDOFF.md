@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **232 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | 10,578 replayed ticks, registry invariants held on every one — and **zero questions sendable** (F18, F30) |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 2** `95D1D36E…` (`python tools/deploy.py --status`); build 3 built, not deployed |
+| Deployed | **build 3** `AA63B6D3…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -21,13 +21,12 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Build | What | Verified in game? |
 |---|---|---|
 | 0 | IL-identical to stock | yes — loads, 4/4 hooks bind, stock's query schema |
-| 1 | roam no longer walks off edges (F28) | **no** |
-| 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **no** |
+| 1 | roam no longer walks off edges (F28) | **yes** — fork-06, stayed on the ground in combat too (user observed) |
+| 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **yes** — fork-06, 516 frames, every check below passes |
 
-| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | **built, not deployed** |
+| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | deployed `AA63B6D3…` from `36faf23`; **not yet launched** |
 
-Build 3 is `mod/` at the commit that adds it (Debug `AA63B6D3…` from this working copy; the
-committed LF tree is what to deploy and register). `compare_dll` vs build 2: `LoadConfig`,
+Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
 `AutoChargePillarsCoroutine`'s state machine (`d__42` → `d__46`) caused by the new property —
 nothing else. Build 2's environmental-damage note stays **above** the blocking check, so it counts
@@ -50,11 +49,9 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
 
 ## Next steps, in order
 
-1. **Verify builds 1 and 2 in game.** From the main menu, AI control on:
-   `python -m eval.fork_check --run-id fork-06 --survivor Commando --difficulty Drizzle`.
-   Then confirm `OBSERVATION` frames appear and look sane:
-   `python -m eval.inspect_recording --run-id fork-06`. Watch for the character stepping off edges
-   *during combat* — combat movement has no edge check (build 1 fixed roam only).
+1. **Launch build 3 once** and check the cfg gained `BlockRepeatDamage = false` under
+   `[Gameplay]`; the next recording's `HARNESS_START` should say `"block_repeat_damage": false`.
+   The OBSERVATION checks below apply to every later run.
 
    "Sane" means, for frames with `in_run: true`:
    - `run.elapsed_s` never decreases within a stage, and stops during pauses
@@ -67,22 +64,23 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
      and `hostile_projectiles_nearby` is 0 when nothing is shooting
    - in the lobby: `in_run: false` with `note: "Not in game"`, not a stale snapshot
 
+   fork-06 (build 2, blackbeach2, died at 525 s) passed all of these. It also saw environmental
+   damage once, at 414 s, with no projectile nearby — source unknown (a fall is the likely
+   candidate; ask the person who watched).
+
    **If a build misbehaves in game:** `deploy.py --restore` goes back to *stock*, not to the
    previous fork build. Build 1's source is commit `e802351` (`deploys.log` predates source
    logging, so it does not say). Rebuilding it from a clean LF checkout gives an IL-identical DLL
    with a **different hash** from `CE424B48…`, because build 1 was compiled from CRLF sources
    (`contract/pinned-build.yaml`, `builds:`). Confirm with `compare_dll` rather than the hash,
    register the new hash as "build 1, LF rebuild", deploy, then return `mod/` to `master`.
-2. **Deploy build 3** with the game closed (`python tools/deploy.py`), register its hash in
-   `KNOWN_BUILDS` and `contract/pinned-build.yaml`, and check the cfg gained
-   `BlockRepeatDamage = false` after one launch.
-3. **Adapter: consume `QUERY_OBSERVATION`** in `brain/stock_adapter.py` — band `elapsed_s` →
+2. **Adapter: consume `QUERY_OBSERVATION`** in `brain/stock_adapter.py` — band `elapsed_s` →
    `run.time_band`, `hp/hp_max` → `self.hp_band`, fill `run.survivor` and `hazards`. Not done yet;
    the recorder already polls and records the query. With it, `next_action` becomes
    sendable on real telemetry for the first time — replay a recording to prove it.
-4. `build.identity`: nothing derives it; it blocks `strategy`, `engage_range` and every worth
+3. `build.identity`: nothing derives it; it blocks `strategy`, `engage_range` and every worth
    gate. `02-ARCHITECTURE.md` permits a deterministic derivation from items.
-5. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+4. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 
