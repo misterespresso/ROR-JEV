@@ -1,0 +1,7 @@
+# Files that go into the mod build keep LF on every checkout. A deterministic build
+# fingerprints its sources, so CRLF conversion would change the DLL hash even though the
+# compiled code is identical -- and recorded build hashes (contract/pinned-build.yaml)
+# would stop reproducing from a fresh clone.
+*.cs        text eol=lf
+*.csproj    text eol=lf
+global.json text eol=lf
