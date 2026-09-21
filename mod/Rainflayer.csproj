@@ -34,6 +34,13 @@
     <PathMap>$(MSBuildProjectDirectory)=/_/mod</PathMap>
     <DebugType>portable</DebugType>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Inside a git repo the SDK queries git and stamps the result into the build: the commit
+         into InformationalVersion (1.0.0+<sha>) and repository data into SourceLink in the PDB,
+         whose ID the DLL carries. Either one made the DLL hash change on EVERY commit, docs
+         included. A build's hash must identify its code, so the SDK's git queries are off;
+         tools/deploy.py records the commit in deploys.log instead. -->
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <!-- Input locations. Override on the command line if your install differs:
