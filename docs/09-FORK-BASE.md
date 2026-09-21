@@ -137,6 +137,11 @@ misconfiguration directly instead of parsing the config file.
 A 2.0.0 fork run with default settings plays a **different game** on Commencement. That is out of
 MVP scope today, but any recording from a 2.0.0 base would carry a silent asterisk.
 
+*(Correction, found while building telemetry: 1.1.1 has a silent gameplay change too, and it is not
+confined to one stage. Every run blocks repeat damage to the player within 0.5 s per attacker — see
+`08-PHASE0-REPORT.md` F29. It does not change the recommendation, since 2.0.0 carries the same hook,
+but E6 was wrong to present the problem as 2.0.0's alone.)*
+
 ### E7 — Hook surface more than doubles
 
 Hooks subscribed (`On.RoR2.* +=`): **4 in 1.1.1, 8 in 2.0.0.**

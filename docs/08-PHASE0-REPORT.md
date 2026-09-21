@@ -111,9 +111,9 @@ The token budget it quoted was nonetheless about right, for offsetting reasons.
 
 ## §3 Findings
 
-Twenty-eight, found by trying to execute the plan rather than by reading it — five in our own
+Thirty, found by trying to execute the plan rather than by reading it — five in our own
 contract (§3), four in the upstream teardown (§3b), thirteen from running the game (§3e, §3f, §3g),
-and six from running the fork (`09-FORK-BASE.md` §9–§10, §3h below). Not all are
+and eight from running and building the fork (`09-FORK-BASE.md` §9–§10, §3h and §3i below). Not all are
 defects: F14 and F16 are load-bearing good news, and three were bugs in my own probe that only real
 telemetry could have exposed.
 
@@ -155,6 +155,8 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F26 | `low_health` is level-triggered: ~60 events/s for as long as HP stays low | open — must be edge-triggered in v2 |
 | F27 | `OBJECTIVE` answers `exploring` in the character-select lobby | fixed in the harness — `INVENTORY`'s marker decides |
 | F28 | **Roam walks off edges in a loop**: detects the cliff, keeps walking, re-picks the same spot | **fixed in fork build 1** — not yet verified in game (`09` §10) |
+| F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **open — a decision: every recording is on an easier game** |
+| F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **open — a contract decision** |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1026,6 +1028,60 @@ with AI control on.
 It cannot recur: `ROR_JEV_PORT` now moves the harness off 7777, every self-test uses 17777, and the
 mock refuses to run on 7777 at all. The mod only ever dials 7777, so a test on another port cannot
 be reached by a running game.
+
+---
+
+## §3i Found while adding telemetry (fork build 2)
+
+### F29 — The mod cancels repeat damage to the player, always
+
+`RainflayerPlugin.HealthComponent_TakeDamage` is registered unconditionally at startup. Its comment
+says it tracks what is damaging the player. It also **cancels** damage: a hit from an attacker that
+already hit the player within `DAMAGE_COOLDOWN = 0.5 s` returns without calling the original method,
+so the damage never happens.
+
+- It is **not** gated on `EnableAIControl`. The human runs — `human-01`, `run-02` — had it too.
+- Anything that hits more often than twice a second is largely blocked: beams, rapid melee, and
+  probably damage-over-time ticks, which carry the attacker who applied them.
+- It does not touch damage with no attacker (falls, environmental), so it is not total.
+
+**Every recording in this project — about 3.5 hours — was made on an easier game than vanilla**, and
+every JEV run would be too. Agent-versus-human comparisons are still like-for-like, since both sides
+had it; comparisons with vanilla play, or claims about difficulty, are not. This is the same category
+of problem `09-FORK-BASE.md` E6 raised against 2.0.0's Mithrix Herald, and it was missed in 1.1.1.
+
+Whether to keep it is a decision, not a fix: it makes a crude agent survive longer, and it makes
+every result less meaningful. Options are to keep it, to make it a config setting defaulting to off
+(vanilla), or to make it a setting defaulting to on (today's behaviour, now visible).
+
+### F30 — `next_action` cannot be sent until the most expensive telemetry exists
+
+An earlier plan said elapsed time plus hazards would unblock `next_action`. Tested against the real
+request builder with every build-2 field filled in, **nothing becomes sendable**:
+
+```
+next_action            blocked by ['threat']
+strategy               blocked by ['threat', 'build.identity']
+engage_range           blocked by ['build.identity', 'threat.enemy_classes']
+engagement_response    blocked by ['threat.reposition_feasible', 'threat.full_withdrawal_feasible']
+```
+
+`next_action` declares the whole `threat` block, and the field contract omits a question if any part
+of a declared block is unknown (F4). Five parts are: `elite_present`, `enemy_classes`,
+`being_focused`, and the two path-feasibility facts, the most expensive measurements in the plan. The
+wrong claim came from the inspector, which counted a "partial" source as available while the brain
+never does; the inspector now matches the brain.
+
+Two ways through:
+
+- **Measure all of `threat`**, feasibility included, before JEV is asked anything.
+- **Narrow the declarations** to the parts each question's instructions actually use, and have the
+  state builder drop unknown sub-fields rather than send them. F4 already recommended narrowing.
+  `next_action` would then need `threat.enemies_near`, `threat.nearest_enemy_band` and
+  `threat.boss_active` — stock already provides all three — plus hazards and time from build 2.
+
+`build.identity` is separate: nothing derives it yet, and it blocks `strategy` and `engage_range`.
+`02-ARCHITECTURE.md` permits a deterministic derivation from items.
 
 ---
 
