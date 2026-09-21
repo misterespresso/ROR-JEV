@@ -1,0 +1,185 @@
+# Pinned build - Phase 0 step 3.
+#
+# Every version the agent depends on, and for the game the SHA-256 of the files that
+# actually matter, because a Steam build id tells you which build Valve shipped and a hash
+# tells you which one is on this disk. Rainflayer's Thunderstore page claims no game-version
+# compatibility and Seekers of the Storm broke a large swathe of legacy mods, so "it worked
+# last week" is not a version.
+#
+# Status of each block is explicit. `verified` means read off this machine. `unpinned` means
+# not installed yet -- NOT "any version is fine".
+#
+# The mod must report these in HELLO_ACK (05-PROTOCOL.md section 3) and the recorder writes
+# them into every recording (brain/recorder.py), so a recording found later is
+# self-describing rather than trusted from memory.
+
+schema_version: 1
+pinned_at: 2026-09-20
+pinned_by: phase_0_step_3
+
+game:
+  status: verified
+  title: Risk of Rain 2
+  platform: steam
+  app_id: 632360
+  build_id: "21587608"
+  depot_manifest: "5715419509320521739"
+  install_path: "C:/Program Files (x86)/Steam/steamapps/common/Risk of Rain 2"
+  size_on_disk_bytes: 3208983811
+  installed_utc: "2026-08-19T21:58:48Z"
+  unity_version: 2021.3.33f1        # from Risk of Rain 2_Data/globalgamemanagers
+  branch: default                   # no BetaKey in the app manifest
+  # Truncated to 32 hex chars for legibility; regenerate full digests with
+  #   Get-FileHash <file> -Algorithm SHA256
+  file_digests_sha256_prefix:
+    "Risk of Rain 2.exe": 931B6D8F111DCEBBE102733B3FF85023
+    "UnityPlayer.dll": CF2BDF3BAF8F65725B8882C178EDB71C
+    "Risk of Rain 2_Data/Managed/RoR2.dll": 0497A902A7AAF3C97FA2F1251A536472
+    "Risk of Rain 2_Data/Managed/Assembly-CSharp.dll": EBABE1976A381798CF19F1422D570818
+  notes: >
+    The human-readable game version string (e.g. "1.3.9") is not stored as a literal in
+    RoR2.dll and could not be read off disk, so the build id, depot manifest and file
+    digests are the pin. The mod can report RoR2Application.GetBuildId() in HELLO_ACK once
+    it builds, and that value should be recorded here to close the gap.
+
+bepinex:
+  status: verified                  # RESOLVED -- F8 was a version divergence, not a contradiction
+  package: bbepis-BepInExPack
+  version: "5.4.2122"
+  major: 5
+  notes: >
+    Settled by what r2modman actually resolved: Rainflayer 1.1.1's Thunderstore manifest
+    declares bbepis-BepInExPack-5.4.2121 and r2modman installed 5.4.2122. So the PUBLISHED
+    mod is a BepInEx 5 mod.
+    The csproj's BepInEx 6 assembly references (BepInEx.Core.dll, BepInEx.Unity.Mono.dll)
+    have been present since the initial commit and describe the 2.0.0 source line, not the
+    1.1.1 package. Consequence for the fork: forking 2.0.0 means BepInEx 6 and a SEPARATE
+    r2modman profile, because this one is BepInEx 5.
+
+r2api:
+  status: installed_not_used        # REFINED -- see notes
+  package: RiskofThunder-R2API_Core
+  version: "5.3.0"
+  notes: >
+    Both things are true and they were conflated earlier. R2API is a DECLARED PACKAGE
+    dependency in Rainflayer's Thunderstore manifest, so r2modman installs it and should be
+    allowed to. It is NOT a code dependency: `git log --all -S R2API` over the whole
+    upstream history returns nothing, and the csproj never references it. Leave it
+    installed; it costs nothing and fighting the package manager gains nothing.
+
+rainflayer:
+  status: installed
+  upstream: https://github.com/justindwang/rainflayer
+  license: MIT
+  installed_package: Rainflayer-Rainflayer
+  installed_version: "1.1.1"        # Thunderstore; matches the roadmap target
+  installed_dll_sha256: 84910CB00D557D50B9A9EDE050C54740D7538C6425BE9B80410D7A3BD88AFD11
+  installed_dll_bytes: 146432
+  source_clone: upstream/rainflayer
+  source_head_commit: 3d8da8c7a86049d8eb04bf50e8736c121344530d
+  source_head_version: "2.0.0"
+  fork:
+    path: mod/
+    base_commit: 01137e5
+    sources_modified: true            # build 1: CombatController.ApplyIdleBehavior (docs/09 section 10)
+    configuration: Debug              # matches the stock build; see docs/09-FORK-BASE.md section 9
+    sdk: "10.0.401"                   # pinned in mod/global.json
+    dll_sha256_debug: C9E558B8671FA35CC353E08F433CD8DA8ECB47ED0EFC2605E32DE9BE4ABA7FC4
+    dll_sha256_release: 0BA2D809D50EFACFCC7C41CFAB0802FA19005DCA3BC1B69CB1FBD801732416C6
+    dll_bytes_debug: 146432           # identical to the stock DLL
+    reproducible: true                # clean rebuild is byte-identical
+    il_identical_to_stock: true       # 317/317 normalised method bodies; eval/compare_dll.py
+    metadata_differences_from_stock: ["BepInPlugin version 1.1.0 -> 1.1.1"]
+    deployed_to: Jev                  # tools/deploy.py; stock backed up to mod/stock/
+    builds:                           # every deployed build; mod/deploys.log has timestamps
+      - {build: 0, sha256_debug: C9E558B8671FA35CC353E08F433CD8DA8ECB47ED0EFC2605E32DE9BE4ABA7FC4, change: "none -- IL-identical to stock"}
+      - {build: 1, sha256_debug: CE424B481B26F5BC745750BCDC19B1BC97DEACB653079DDBBFC7D93AA0176794, change: "roam edge loop: stop at edges, mark abandoned waypoint visited", methods_changed: ["CombatController::ApplyIdleBehavior"], verified_in_game: false}
+    runtime_verified:                 # fork-gonogo-01 / fork-01, 2026-09-21
+      loaded_as: "Rainflayer 1.1.1"   # BepInEx log; stock would read 1.1.0
+      hooks_bound: 4 of 4
+      query_schema_matches_stock: true
+      behaviour_under_ai_control: PARTIAL   # AI-only events fire; no clean GO yet (report F27)
+    mmhook_ror2_sha256_prefix: 3C705F2A01D556904B9EFCB37642DA80   # build input, tied to game build
+  fork_decision:
+    base_commit: 01137e5             # declares 1.1.1; see docs/09-FORK-BASE.md
+    bepinex_major: 5
+    record: docs/09-FORK-BASE.md
+    caveat: >
+      The installed DLL declares plugin version 1.1.0 and no commit ever declared 1.1.0, so
+      01137e5 is the closest commit to the validated artifact, not provably identical. The
+      fork's first milestone is reproducing the Phase 0 recordings, which measures that gap
+      instead of assuming it away.
+    build_inputs_present: 15 of 15
+  declared_dependencies:
+    - bbepis-BepInExPack-5.4.2121
+    - RiskofThunder-HookGenPatcher-1.2.9
+    - RiskofThunder-R2API_Core-5.3.0
+  verified_capabilities:            # string-extracted from the installed assembly
+    queries: [QUERY_OBJECTIVE, QUERY_INVENTORY, QUERY_COMBAT_STATUS,
+              QUERY_INTERACTABLES, QUERY_ALLIES, QUERY_PILLARS]
+    commands: [FIND_AND_INTERACT, BUY_SHOP_ITEM, GOTO, STRATEGY, MODE]
+    mode_args: [roam, combat, follow, wait, defend_zone]
+    strategy_args: [aggressive, defensive, balanced, support]
+  notes: >
+    The RUNTIME is 1.1.1 and the SOURCE clone is 2.0.0 -- a deliberate split, not a mistake:
+    1.1.1 is what the go/no-go gate tests, and it is the version the roadmap named. All six
+    queries, every command, and defend_zone are present in the installed assembly, so
+    eval/gonogo_probe.py (written against 2.0.0's protocol doc) is compatible with 1.1.1.
+    The package ships macOS AppleDouble junk (`._Rainflayer.dll`, `._manifest.json`, ...).
+    Any tooling that globs for the DLL must exclude `._*` -- the 163-byte `._Rainflayer.dll`
+    stub is not an assembly.
+
+other_installed_packages:           # pulled in transitively by BepInExPack
+  RiskofThunder-RoR2BepInExPack: "1.43.0"
+  RiskofThunder-HookGenPatcher: "1.2.9"
+  RiskofThunder-BepInEx_GUI: "3.0.3"
+  RiskofThunder-FixPluginTypesSerialization: "1.0.4"
+  pseudopulse-SeekersPatcher: "1.4.1"
+  score-MiscFixes: "1.5.9"
+
+r2modman:
+  status: installed
+  version: "3.2.19"
+  profile: Jev
+  profile_path: "%APPDATA%/r2modmanPlus-local/RiskOfRain2/profiles/Jev"
+  notes: >
+    Launch the game through r2modman ("Start modded"); launching from Steam directly does
+    not inject BepInEx and the probe will see no connection.
+
+toolchain:
+  python:
+    status: verified
+    version: 3.13.13
+    required: ">=3.10"
+    packages:
+      PyYAML: 6.0.3
+  dotnet_sdk:
+    status: verified
+    version: 10.0.401
+    pinned_by: mod/global.json (rollForward latestPatch)
+    previously: missing
+    notes: >
+      `dotnet --list-sdks` returns nothing. Required to build the forked mod from source
+      (step 3). Building against the game assemblies also needs the DLLs referenced from
+      the install path above.
+  ollama:
+    status: verified
+    notes: Present on PATH. Phase 6 only; not required before then.
+
+jev:
+  status: unpinned
+  model: jev-1.13.0                 # pinned in the contract; see contract/questions.yaml
+  api_key_present: false            # Phase 0 makes no paid calls by design
+  endpoint: https://api.typesafe.ai/v1/systemone
+
+# What HELLO_ACK must carry so a session can be matched to this file.
+hello_ack_fields:
+  - game_version
+  - game_build_id
+  - unity_version
+  - bepinex_version
+  - r2api_version
+  - mod_version
+  - protocol_version
+  - registry_version
+  - capabilities

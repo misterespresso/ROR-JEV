@@ -1,0 +1,131 @@
+"""Deploy the fork's DLL into the r2modman profile, or restore stock Rainflayer.
+
+The fork keeps upstream's plugin GUID (`justindwang.rainflayer`) for now, so it REPLACES stock
+rather than loading beside it. Two plugins with one GUID would make BepInEx pick one; two
+plugins with different GUIDs would both hook player input and both dial port 7777. Neither is
+acceptable, so deployment is a swap.
+
+The stock DLL is backed up once, on first deploy, to `mod/stock/` (gitignored). Restoring is
+always possible from there.
+
+Every deploy prints the sha256 of what is now installed and appends it to `mod/deploys.log`,
+so a recording can always be matched to the exact binary that produced it -- the gap that
+made E1 in docs/09-FORK-BASE.md necessary in the first place.
+
+Close the game first: a loaded plugin DLL is locked on Windows.
+
+Run:
+    python tools/deploy.py                 # deploy mod/bin/Debug build
+    python tools/deploy.py --config Release
+    python tools/deploy.py --restore       # put stock back
+    python tools/deploy.py --status        # what is installed right now
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import pathlib
+import shutil
+import sys
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+PROFILE = pathlib.Path(os.environ.get("APPDATA", "")) / "r2modmanPlus-local" / "RiskOfRain2" \
+    / "profiles" / "Jev"
+TARGET = PROFILE / "BepInEx" / "plugins" / "Rainflayer-Rainflayer" / "Rainflayer.dll"
+BACKUP = ROOT / "mod" / "stock" / "Rainflayer-1.1.0.dll"
+LOG = ROOT / "mod" / "deploys.log"
+
+#: sha256 of the stock DLL the Phase 0 recordings were made with.
+STOCK_SHA = "84910CB00D557D50B9A9EDE050C54740D7538C6425BE9B80410D7A3BD88AFD11"
+
+
+def sha(p: pathlib.Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest().upper()
+
+
+#: Known fork builds, so the log and --status name them. Keep in step with
+#: contract/pinned-build.yaml.
+KNOWN_BUILDS = {
+    "C9E558B8671FA35CC353E08F433CD8DA8ECB47ED0EFC2605E32DE9BE4ABA7FC4": "fork build 0 (IL-identical to stock)",
+    "CE424B481B26F5BC745750BCDC19B1BC97DEACB653079DDBBFC7D93AA0176794": "fork build 1 (roam edge fix)",
+}
+
+
+def describe(h: str) -> str:
+    if h == STOCK_SHA:
+        return "STOCK 1.1.0 (what the recordings validated)"
+    return KNOWN_BUILDS.get(h, "fork build (unregistered -- add it to KNOWN_BUILDS)")
+
+
+def log(action: str, h: str) -> None:
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("a", encoding="utf-8") as f:
+        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')}  {action:<8} {h}  {describe(h)}\n")
+
+
+def copy(src: pathlib.Path, dst: pathlib.Path) -> None:
+    try:
+        shutil.copyfile(src, dst)
+    except PermissionError:
+        raise SystemExit(f"cannot write {dst} -- is the game running? Close it and retry.")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Deploy or restore the mod DLL")
+    ap.add_argument("--config", default="Debug", choices=["Debug", "Release"],
+                    help="Debug matches the stock build and is the default")
+    ap.add_argument("--restore", action="store_true")
+    ap.add_argument("--status", action="store_true")
+    a = ap.parse_args()
+
+    if not TARGET.exists():
+        raise SystemExit(f"no installed Rainflayer at {TARGET} -- is the Jev profile set up?")
+
+    if a.status:
+        h = sha(TARGET)
+        print(f"installed : {TARGET}")
+        print(f"sha256    : {h}")
+        print(f"is        : {describe(h)}")
+        print(f"backup    : {'present' if BACKUP.exists() else 'none yet'} ({BACKUP})")
+        return 0
+
+    if a.restore:
+        if not BACKUP.exists():
+            raise SystemExit("no backup to restore from -- stock was never replaced")
+        copy(BACKUP, TARGET)
+        h = sha(TARGET)
+        log("restore", h)
+        print(f"restored stock -> {TARGET}\nsha256 {h}  ({describe(h)})")
+        return 0
+
+    build = ROOT / "mod" / "bin" / a.config / "netstandard2.1" / "Rainflayer.dll"
+    if not build.exists():
+        raise SystemExit(f"no build at {build} -- run: cd mod && dotnet build -c {a.config}")
+
+    current = sha(TARGET)
+    if not BACKUP.exists():
+        if current != STOCK_SHA:
+            raise SystemExit(
+                "refusing to take the first backup: the installed DLL is not the stock one the\n"
+                f"recordings used (sha {current[:16]}...). Reinstall Rainflayer in r2modman first.")
+        BACKUP.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(TARGET, BACKUP)
+        print(f"backed up stock -> {BACKUP}")
+
+    copy(build, TARGET)
+    h = sha(TARGET)
+    if h != sha(build):
+        raise SystemExit("copy verification failed: installed hash does not match the build")
+    log("deploy", h)
+    print(f"deployed {a.config} build -> {TARGET}")
+    print(f"sha256 {h}")
+    print()
+    print("Note: r2modman's 'update' on Rainflayer would overwrite this with stock.")
+    print("Restore any time with: python tools/deploy.py --restore")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

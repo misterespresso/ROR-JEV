@@ -1,0 +1,114 @@
+# Phase capability manifest - machine-readable.
+#
+# Two reviews found the same defect: a phase's catalog consuming commands scheduled for a later
+# phase. Revision 3 reduced it with capability-gating but left two cases (T5 preemption rerun in
+# Phase 3 vs implementation in Phase 4; the Stage 1 milestone needing holdout behavior before
+# defend_zone existed).
+#
+# This file is the fix. C3 generates from it:
+#   for each phase, every capability required by an ENABLED question, and every capability
+#   named by a reachable registry record, MUST be in that phase's cumulative capability set.
+#
+# A test that exercises a capability absent from its phase is a scheduling bug, and CI says so.
+
+schema_version: 1
+
+phases:
+
+  phase_0:
+    name: Compatibility and observability
+    capabilities:
+      - observation_v2          # single sequenced main-thread snapshot
+    notes: >
+      Telemetry and recording only. No decisions, no paid calls. Reachability and feasibility are
+      computed on a MAIN-THREAD time-sliced schedule and cached with *_age_ms. "Background
+      cadence" means scheduled, not off-thread - Unity APIs crash on worker threads, which is why
+      the stock mod already marshals everything through a main-thread dispatch queue. Only
+      genuinely thread-safe computation over copied data may leave the main thread.
+
+  phase_1:
+    name: Contract
+    inherits: phase_0
+    adds: []
+    notes: >
+      Registry schema, protocol state machine, fake-mod suite. No game required, no paid calls
+      beyond the live smoke subset.
+
+  phase_2:
+    name: Minimal JEV vertical slice
+    inherits: phase_1
+    adds:
+      - navigate_target
+      - interact_target
+      - search
+      - set_posture             # minimal: strategy + engage_range applied
+      - disengage               # minimal: retreat along a feasible path
+      - defend_zone             # minimal: hold inside the charging radius
+    notes: >
+      defend_zone is pulled forward because the first milestone requires completing teleporter
+      charging. Stock Rainflayer already has holdout behavior (MODE:defend_zone); if it verifies,
+      it is EXPOSED through the new contract rather than rewritten. Minimal variants are
+      capability-complete for their phase - they are not stubs that reject.
+
+  phase_3:
+    name: Reliable execution at rate
+    inherits: phase_2
+    adds:
+      - preemption              # suspended / resumed transitions
+      - reconnect               # RECONCILE + watermark
+      - opportunity_tokens
+      - cost_limit_enforcement
+    notes: >
+      T5 (preemption) and T18 (reconnect) run in-game HERE, not in Phase 2 - matching where the
+      capability lands. Revision 3 scheduled the T5 rerun a phase before its implementation.
+
+  phase_4:
+    name: Survival and capability expansion
+    inherits: phase_3
+    adds:
+      - disengage_survivor_mobility
+      - equipment
+      - fight_target
+      - safety_reflex_events    # reflex activations as first-class journal events (T14)
+    notes: >
+      use_equipment_now is disabled until `equipment` lands - enforced by its enabled_when in
+      questions.yaml, so the catalog cannot reference it early.
+      safety_reflex_events closes the T14 gap: reflexes fire in C# and the provenance invariant is
+      checked in Python against the journal, so a reflex that acts without emitting an event is
+      invisible to the check.
+
+  phase_5:
+    name: Evaluation
+    inherits: phase_4
+    adds: []
+
+  phase_6:
+    name: Optional counsel
+    inherits: phase_5
+    adds:
+      - counsel                 # gates situation_is_novel via enabled_when: counsel_enabled
+    notes: >
+      Benchmark Qwen3-8B WITH RoR2 running. The ~112 tok/s figure is standalone; game and model
+      share VRAM and GPU time on a 16 GB card. If it costs frames, it costs survival.
+
+# Required by the first milestone: Commando, Drizzle, solo, L2 disabled - clear Stage 1, leave
+# through the teleporter, reject stale/invalid commands during an injected API outage.
+milestone_1:
+  target_phase: phase_2
+  required_capabilities:
+    - observation_v2
+    - navigate_target
+    - interact_target
+    - search
+    - set_posture
+    - disengage
+    - defend_zone
+  required_questions:
+    - next_action
+    - engagement_response
+    - strategy
+    - engage_range
+    - continue_is_worthwhile
+  excluded_questions:
+    - situation_is_novel        # counsel disabled
+    - use_equipment_now         # equipment capability is phase_4

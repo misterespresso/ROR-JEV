@@ -1,0 +1,322 @@
+# Question contract - machine-readable source of truth.
+#
+# The CI consistency checks (07-TEST-PLAN.md C1-C4) are GENERATED from this file rather than
+# grepped from prose. Revision 3 tried to enforce "no question references another's outcome"
+# by pattern-matching natural-language instructions, which cannot be reliable.
+#
+# Rules enforced from this metadata:
+#   C1  every question has >=1 policy_consumer, and every consumer exists in the dispatcher
+#   C2  every emitted command exists in the protocol vocabulary
+#   C3  required_capabilities subset of the target phase's capability manifest
+#   C4  references_answers MUST be empty for every question
+#
+# `enabled_when` is evaluated at request-build time. A question whose condition is false is
+# OMITTED from the request entirely - never sent with a null (02-ARCHITECTURE.md field contract).
+
+schema_version: 1
+model: jev-1.13.0
+
+questions:
+
+  next_action:
+    type: choice
+    dynamic: true                      # options generated from the action registry
+    enabled_when: always               # registry is never empty (06 invariant 1)
+    required_state_fields:
+      - threat
+      - hazards
+      - economy.gold_band
+      - run.time_band
+      - objective.phase
+    required_capabilities: []          # individual options are capability-gated in the registry
+    policy_consumers:
+      - dispatch.task_channel
+    references_answers: []
+    notes: >
+      The ONLY question that selects an executable task. Revision 2's primary_objective could
+      contradict it inside the same parallel request; revision 3 removed it.
+
+  engagement_response:
+    type: choice
+    options: [hold_and_fight, reposition, full_disengage]
+    enabled_when: capability(disengage)
+    required_state_fields:
+      - threat.reposition_feasible
+      - threat.full_withdrawal_feasible
+      - hazards
+    required_capabilities: [disengage]
+    policy_consumers:
+      - dispatch.disengage_channel
+    references_answers: []
+
+  strategy:
+    type: choice
+    options: [aggressive, defensive, balanced]
+    enabled_when: capability(set_posture)
+    required_state_fields: [threat, self.hp_band, build.identity]
+    required_capabilities: [set_posture]
+    policy_consumers:
+      - dispatch.posture_channel
+    references_answers: []
+    hysteresis: { entry: 0.55, exit: 0.35, dwell_ms: 800 }
+
+  engage_range:
+    type: choice
+    options: [melee, close, mid, far]
+    enabled_when: capability(set_posture)
+    required_state_fields: [run.survivor, build.identity, threat.enemy_classes]
+    required_capabilities: [set_posture]
+    policy_consumers:
+      - dispatch.posture_channel
+    references_answers: []
+    hysteresis: { entry: 0.50, exit: 0.30, dwell_ms: 600 }
+
+  continue_is_worthwhile:
+    type: noul
+    enabled_when: active_task_exists
+    required_state_fields:
+      - control.active_action
+      - control.progress_band          # MEASURED by the mod, never inferred by JEV
+      - control.consecutive_failures
+    required_capabilities: []
+    policy_consumers:
+      - dispatch.task_channel.cancel
+    references_answers: []
+    threshold: { abandon_below: 0.35 }
+
+  use_equipment_now:
+    type: noul
+    # All four equipment contract fields must hold (03-QUESTION-SET.md section 3).
+    enabled_when: >
+      capability(equipment)
+      and self.equipment.supported_activation
+      and self.equipment.ready
+      and self.equipment.valid_target_available
+      and self.equipment.activation_compatible
+    required_state_fields: [self.equipment]
+    required_capabilities: [equipment]
+    policy_consumers:
+      - dispatch.equipment_channel
+    references_answers: []
+    threshold: { fire_above: 0.65 }
+
+  situation_is_novel:
+    type: noul
+    # Its ONLY consumer is L2 escalation, and L2 is disabled by default (--jev-only).
+    # Revision 3 sent it unconditionally, which violated C1 in the default configuration.
+    enabled_when: counsel_enabled
+    required_state_fields: [threat, objective.phase, control]
+    required_capabilities: []
+    policy_consumers:
+      - counsel.escalation_trigger
+    references_answers: []
+    threshold: { escalate_above: 0.70 }
+
+# Generated per-tick, one per registry record with requires_worth_gate: true.
+# Name: worth_<action_id>. Independently answerable - names its own entity, references no
+# other answer. This is the fix for the revision-1 answer-chaining defect.
+dynamic_question_templates:
+  worth_gate:
+    type: noul
+    name_pattern: "worth_{action_id}"
+    generated_from: registry.records[requires_worth_gate == true]
+    required_state_fields: [economy.gold_band, self.hp_band, build.identity]
+    policy_consumers:
+      - dispatch.task_channel.gates_satisfied
+    references_answers: []
+    threshold: { authorize_above: 0.75 }
+
+# Probability gates on next_action, keyed by the selected record's commitment class.
+# Worth gates apply to `irreversible` ONLY - see 06-ACTION-REGISTRY.md section 3.
+commitment_gates:
+  reversible:   { entry: 0.40, worth_gate_required: false }
+  costly:       { entry: 0.50, worth_gate_required: false }
+  irreversible: { entry: 0.55, worth_gate_required: true }
+
+# Questions deliberately held out of the MVP. Each names what it needs before returning.
+deferred:
+  threat_level:
+    reason: >
+      No policy consumer, and a legend maps integer indices to descriptions so it cannot resolve
+      a fractional score. Needs short stable level labels plus an explicit interpretation rule
+      consuming `probabilities` by name - never the scalar.
+  time_pressure:
+    reason: Same as threat_level.
+  primary_objective:
+    reason: >
+      Could contradict next_action within the same parallel request. If reinstated, it must be a
+      persistent recommendation adopted for SUBSEQUENT observations, never read in the tick that
+      produced it.
+  build_identity: { reason: No executable consumer until Group E commands exist. }
+  printer_worth_using: { reason: Requires use_printer capability. }
+  shop_item_pick: { reason: Requires multishop telemetry. }
+  pillar_target: { reason: Commencement only; out of MVP scope. }
+  hold_the_zone: { reason: Requires defend_zone beyond the minimal Phase 2 version. }
+
+# ---------------------------------------------------------------------------------------
+# WIRE PAYLOAD  (added in Phase 0 for roadmap step 6 / check C8)
+#
+# The token-bearing text -- `instructions` and `criteria` -- previously existed only as
+# prose in docs/03-QUESTION-SET.md, so the serialized catalog could not be built and its
+# size could not be measured. It is transcribed here verbatim from 03 section 1.
+#
+# Entries marked AUTHORED-IN-PHASE-0 had no option prose in 03: their verbs are listed in
+# the registry taxonomy but were never given text. They follow the same what/not_for
+# rubric and are flagged for review before the catalog is treated as settled.
+#
+# Rule 6 of section 0 applies to every string here: state fields are referenced by name in
+# backticks, and every question is phrased positively.
+# ---------------------------------------------------------------------------------------
+
+payload:
+
+  next_action:
+    instructions: >-
+      Choose what the character should do next. Each option is a complete committed action
+      including what it costs. Judge each against `threat`, `hazards`, `economy.gold_band`,
+      `run.time_band` and `objective.phase`.
+    # Per-verb option text. The rendered option key is `<verb>:<entity_id>` for entity
+    # verbs and the bare verb for non-entity verbs.
+    option_templates:
+      open_chest:
+        what: "Open the {cost_band} chest you are standing at. Spends gold, guaranteed item."
+        not_for: "When gold is better saved or the route is unsafe."
+      use_shrine_chance:
+        what: "Gamble at the Shrine of Chance you are standing at. Spends gold, may give nothing."
+        not_for: "Runs that cannot afford to lose the gold."
+      start_teleporter:
+        what: "Begin the boss event at the teleporter you are standing at. Irreversible."
+        not_for: "A character too weak for the boss, or reachable loot with time to take it."
+      search_teleporter:
+        what: "Explore the stage to find the teleporter. Costs only time."
+        not_for: "Stages where the teleporter is already found."
+      explore:
+        what: "Move through unexplored parts of the stage looking for anything useful."
+      navigate:                                    # AUTHORED-IN-PHASE-0
+        what: "Travel to this target so it can be interacted with on arrival. Costs only time."
+        not_for: "Targets whose reward does not justify crossing the distance."
+      use_shrine_blood:                            # AUTHORED-IN-PHASE-0
+        what: "Pay health at the Shrine of Blood you are standing at. Spends health, gives gold."
+        not_for: "Low health, or a fight that is about to start."
+      advance_stage:                               # AUTHORED-IN-PHASE-0
+        what: "Leave the stage through the charged teleporter you are standing at. Irreversible."
+        not_for: "Reachable loot the run still needs, with time left to take it."
+      defend_zone:                                 # AUTHORED-IN-PHASE-0
+        what: "Hold position inside the teleporter radius so it keeps charging."
+        not_for: "When the position cannot be survived."
+      fight_boss:                                  # AUTHORED-IN-PHASE-0
+        what: "Commit to attacking this specific enemy until it dies."
+        not_for: "When the fight is being lost, or a lesser threat is the real problem."
+    sentinels:
+      none:
+        what: "Start nothing new right now."
+        not_for: "When a clearly worthwhile action is available."
+      continue_current_action:                     # AUTHORED-IN-PHASE-0
+        what: "Keep working on the action already in progress. Starts nothing new."
+        not_for: "When the action in progress no longer serves the run."
+
+  engagement_response:
+    instructions: >-
+      How should the character respond to the current situation?
+      `threat.reposition_feasible` and `threat.full_withdrawal_feasible` state which
+      movements are possible; do not choose one that is not feasible. `hazards` describes
+      damage sources that are not engaged enemies.
+    criteria:
+      hold_and_fight:
+        what: "Stay and finish the fight, or stay put if nothing is threatening."
+        not_for: "When the fight is being lost, or a hazard is doing steady damage."
+      reposition:
+        what: >-
+          Move to better ground while staying engaged - break line of sight, gain height,
+          leave a melee cluster or a hazard volume.
+        not_for: "When a full withdrawal is needed."
+      full_disengage:
+        what: >-
+          Withdraw from the area entirely and recover. Temporarily abandoning an objective
+          is acceptable if staying would be fatal.
+        not_for: "When the threat is mild enough to handle by repositioning."
+
+  strategy:
+    instructions: >-
+      Choose the combat posture that fits `threat`, `self.hp_band` and `build.identity`.
+    criteria:
+      aggressive:
+        what: "Close distance and maximise damage."
+        not_for: "Low health or heavy incoming fire."
+      defensive:
+        what: "Prioritise survival, keep distance, use mobility."
+        not_for: "Fights that must end quickly."
+      balanced:
+        what: "Trade damage and safety evenly."
+        not_for: "Clear emergencies in either direction."
+
+  engage_range:
+    instructions: >-
+      At what distance should the character fight, given `run.survivor`, `build.identity`
+      and `threat.enemy_classes`?
+    criteria:
+      melee:
+        what: "Directly adjacent. For melee survivors and short-range builds."
+      close:
+        what: "Just outside melee reach, staying mobile."
+      mid:
+        what: "Comfortable weapon range, kiting between shots."
+      far:
+        what: "Maximum effective range, avoiding melee contact."
+
+  continue_is_worthwhile:
+    instructions: >-
+      Progress on `control.active_action` is `control.progress_band`, with
+      `control.consecutive_failures` recent failures. Is continuing still worth the time it
+      is taking?
+    criteria:
+      "true": "The action remains valuable and is worth more attempts."
+      "false": "The time cost now outweighs the reward."
+
+  use_equipment_now:
+    instructions: >-
+      Should the character trigger `self.equipment.name` right now? Judge whether this
+      moment justifies spending a limited-cooldown item of that kind.
+    criteria:
+      "true": "This moment justifies spending this particular equipment."
+      "false": "Hold it. A clearly better moment is close, or the situation does not warrant it."
+
+  situation_is_novel:
+    instructions: >-
+      Is the character in a situation that the available actions do not describe well?
+    criteria:
+      "true": "Something unusual is happening that the available actions do not cleanly address."
+      "false": "An ordinary situation, well covered by the available actions."
+
+  # One per registry record with requires_worth_gate: true. Per-verb instruction template;
+  # `{entity_id}` is the target's stable entity ID.
+  worth_gate:
+    option_templates:
+      use_shrine_chance:
+        instructions: >-
+          Is gambling at Shrine of Chance `{entity_id}` worth its gold cost right now, given
+          `economy.gold_band` and how much this run needs items?
+        criteria:
+          "true": "The expected item is worth the gold and the risk of nothing."
+          "false": "The gold is better spent on a guaranteed reward."
+      use_shrine_blood:                            # AUTHORED-IN-PHASE-0
+        instructions: >-
+          Is paying health at Shrine of Blood `{entity_id}` worth it right now, given
+          `self.hp_band`, `threat` and `economy.gold_band`?
+        criteria:
+          "true": "The gold is worth the health, and the health can be spared here."
+          "false": "The health is worth more than the gold right now."
+      start_teleporter:                            # AUTHORED-IN-PHASE-0
+        instructions: >-
+          Is starting the boss event at teleporter `{entity_id}` worth it right now, given
+          `self.hp_band`, `build.identity` and `run.time_band`?
+        criteria:
+          "true": "The character is ready for the boss and the run gains from starting now."
+          "false": "More preparation is worth the time it costs."
+      advance_stage:                               # AUTHORED-IN-PHASE-0
+        instructions: >-
+          Is leaving the stage through teleporter `{entity_id}` worth it right now, given
+          `run.time_band`, `economy.gold_band` and what is still reachable here?
+        criteria:
+          "true": "This stage has given what it is going to give."
+          "false": "Something reachable here is still worth the time."

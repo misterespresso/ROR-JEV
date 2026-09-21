@@ -1,0 +1,416 @@
+{
+  "measured_at_phase": 0,
+  "contract_schema_version": 1,
+  "model": "jev-1.13.0",
+  "capabilities": [
+    "defend_zone",
+    "disengage",
+    "interact_target",
+    "navigate_target",
+    "observation_v2",
+    "search",
+    "set_posture"
+  ],
+  "counsel_enabled": false,
+  "method": {
+    "bytes": "exact, json.dumps compact separators, UTF-8",
+    "tokens": "ESTIMATED, bracketed",
+    "chars_per_token_low": 4.0,
+    "chars_per_token_high": 3.0,
+    "ground_truth": "usage.input_tokens on the first Phase 2 call -- NOT YET TAKEN"
+  },
+  "price_per_m_input_usd": 0.042,
+  "scenarios": [
+    {
+      "scenario": "floor_undiscovered",
+      "note": "Teleporter not found, nothing visible. The smallest catalog the agent ever sends, and the one an idle-throttled tick pays for.",
+      "questions": 4,
+      "worth_gates": 0,
+      "registry_records": 2,
+      "registry_entity_actions": 0,
+      "catalog_chars": 2460,
+      "catalog_bytes": 2460,
+      "state_chars": 958,
+      "state_bytes": 958,
+      "request_chars": 3462,
+      "request_bytes": 3462,
+      "catalog_tokens_est": [
+        615,
+        820
+      ],
+      "state_tokens_est": [
+        240,
+        319
+      ],
+      "request_tokens_est": [
+        866,
+        1154
+      ],
+      "per_question_chars": {
+        "next_action": 604,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "navigate_only",
+      "note": "Three targets, none in range. Every entity action is `navigate`.",
+      "questions": 4,
+      "worth_gates": 0,
+      "registry_records": 3,
+      "registry_entity_actions": 2,
+      "catalog_chars": 2682,
+      "catalog_bytes": 2682,
+      "state_chars": 1147,
+      "state_bytes": 1147,
+      "request_chars": 3873,
+      "request_bytes": 3873,
+      "catalog_tokens_est": [
+        670,
+        894
+      ],
+      "state_tokens_est": [
+        287,
+        382
+      ],
+      "request_tokens_est": [
+        968,
+        1291
+      ],
+      "per_question_chars": {
+        "next_action": 826,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "chest_in_range",
+      "note": "Standing at a chest: `open_chest` is costly, so a probability gate only.",
+      "questions": 4,
+      "worth_gates": 0,
+      "registry_records": 3,
+      "registry_entity_actions": 2,
+      "catalog_chars": 2665,
+      "catalog_bytes": 2665,
+      "state_chars": 1147,
+      "state_bytes": 1147,
+      "request_chars": 3856,
+      "request_bytes": 3856,
+      "catalog_tokens_est": [
+        666,
+        888
+      ],
+      "state_tokens_est": [
+        287,
+        382
+      ],
+      "request_tokens_est": [
+        964,
+        1285
+      ],
+      "per_question_chars": {
+        "next_action": 809,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "shrine_in_range",
+      "note": "Standing at a Shrine of Chance: irreversible, so it adds a worth-gate Noul.",
+      "questions": 5,
+      "worth_gates": 1,
+      "registry_records": 4,
+      "registry_entity_actions": 3,
+      "catalog_chars": 3207,
+      "catalog_bytes": 3207,
+      "state_chars": 1253,
+      "state_bytes": 1253,
+      "request_chars": 4504,
+      "request_bytes": 4504,
+      "catalog_tokens_est": [
+        802,
+        1069
+      ],
+      "state_tokens_est": [
+        313,
+        418
+      ],
+      "request_tokens_est": [
+        1126,
+        1501
+      ],
+      "per_question_chars": {
+        "next_action": 1004,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433,
+        "worth_use_shrine_chance:entity-51": 310
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "teleporter_in_range",
+      "note": "Standing at the idle teleporter: `start_teleporter`, irreversible, gated.",
+      "questions": 5,
+      "worth_gates": 1,
+      "registry_records": 3,
+      "registry_entity_actions": 2,
+      "catalog_chars": 3049,
+      "catalog_bytes": 3049,
+      "state_chars": 1147,
+      "state_bytes": 1147,
+      "request_chars": 4240,
+      "request_bytes": 4240,
+      "catalog_tokens_est": [
+        762,
+        1016
+      ],
+      "state_tokens_est": [
+        287,
+        382
+      ],
+      "request_tokens_est": [
+        1060,
+        1413
+      ],
+      "per_question_chars": {
+        "next_action": 842,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433,
+        "worth_start_teleporter:entity-03": 315
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "charged_advance",
+      "note": "Teleporter charged and in range: `advance_stage`, irreversible, gated.",
+      "questions": 5,
+      "worth_gates": 1,
+      "registry_records": 2,
+      "registry_entity_actions": 1,
+      "catalog_chars": 2849,
+      "catalog_bytes": 2849,
+      "state_chars": 1043,
+      "state_bytes": 1043,
+      "request_chars": 3936,
+      "request_bytes": 3936,
+      "catalog_tokens_est": [
+        712,
+        950
+      ],
+      "state_tokens_est": [
+        261,
+        348
+      ],
+      "request_tokens_est": [
+        984,
+        1312
+      ],
+      "per_question_chars": {
+        "next_action": 650,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433,
+        "worth_advance_stage:entity-03": 310
+      },
+      "omitted": [
+        {
+          "question": "continue_is_worthwhile",
+          "reason": "enabled_when",
+          "condition": "active_task_exists"
+        },
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "navigating_active",
+      "note": "A task is running, so `continue_current_action` and `continue_is_worthwhile` both appear.",
+      "questions": 5,
+      "worth_gates": 0,
+      "registry_records": 3,
+      "registry_entity_actions": 2,
+      "catalog_chars": 3205,
+      "catalog_bytes": 3205,
+      "state_chars": 1170,
+      "state_bytes": 1170,
+      "request_chars": 4419,
+      "request_bytes": 4419,
+      "catalog_tokens_est": [
+        801,
+        1068
+      ],
+      "state_tokens_est": [
+        292,
+        390
+      ],
+      "request_tokens_est": [
+        1105,
+        1473
+      ],
+      "per_question_chars": {
+        "next_action": 997,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433,
+        "continue_is_worthwhile": 326
+      },
+      "omitted": [
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    },
+    {
+      "scenario": "ceiling_twelve",
+      "note": "Registry at its invariant-9 cap of 12 entity actions, four of them irreversible and in range. The worst tick the cost model must survive.",
+      "questions": 9,
+      "worth_gates": 4,
+      "registry_records": 13,
+      "registry_entity_actions": 12,
+      "catalog_chars": 6415,
+      "catalog_bytes": 6415,
+      "state_chars": 2147,
+      "state_bytes": 2147,
+      "request_chars": 8606,
+      "request_bytes": 8606,
+      "catalog_tokens_est": [
+        1604,
+        2138
+      ],
+      "state_tokens_est": [
+        537,
+        716
+      ],
+      "request_tokens_est": [
+        2152,
+        2869
+      ],
+      "per_question_chars": {
+        "next_action": 2819,
+        "engagement_response": 899,
+        "strategy": 457,
+        "engage_range": 433,
+        "continue_is_worthwhile": 326,
+        "worth_use_shrine_chance:entity-60": 310,
+        "worth_use_shrine_chance:entity-61": 310,
+        "worth_use_shrine_chance:entity-62": 310,
+        "worth_use_shrine_chance:entity-63": 310
+      },
+      "omitted": [
+        {
+          "question": "use_equipment_now",
+          "reason": "enabled_when",
+          "condition": "capability(equipment) and self.equipment.supported_activation and self.equipment.ready and self.equipment.valid_target_available and self.equipment.activation_compatible\n"
+        },
+        {
+          "question": "situation_is_novel",
+          "reason": "enabled_when",
+          "condition": "counsel_enabled"
+        }
+      ]
+    }
+  ]
+}

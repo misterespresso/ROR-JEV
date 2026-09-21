@@ -1,0 +1,89 @@
+# GENERATED from brain/registry.py by `python -m eval.gen_actions`. Do not edit by hand.
+# The verb taxonomy lives in code so the registry builder and this file cannot drift.
+schema_version: 1
+
+commitment_gates:
+  reversible: { entry: 0.4, worth_gate_required: false }
+  costly: { entry: 0.5, worth_gate_required: false }
+  irreversible: { entry: 0.55, worth_gate_required: true }
+
+worth_threshold: 0.75
+
+# Registry invariant 9. Ranking is in-range first, then nearest, then entity ID;
+# everything the cap cuts is recorded so Phase 5 can ask what was never offered.
+max_entity_actions: 12
+
+verbs:
+  navigate:
+    command: NAVIGATE_TARGET
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: navigate_target
+  open_chest:
+    command: INTERACT_TARGET
+    commitment: costly
+    range_gated: true
+    requires_worth_gate: false
+    capability: interact_target
+  use_shrine_chance:
+    command: INTERACT_TARGET
+    commitment: irreversible
+    range_gated: true
+    requires_worth_gate: true
+    capability: interact_target
+  use_shrine_blood:
+    command: INTERACT_TARGET
+    commitment: irreversible
+    range_gated: true
+    requires_worth_gate: true
+    capability: interact_target
+  start_teleporter:
+    command: INTERACT_TARGET
+    commitment: irreversible
+    range_gated: true
+    requires_worth_gate: true
+    capability: interact_target
+  advance_stage:
+    command: INTERACT_TARGET
+    commitment: irreversible
+    range_gated: true
+    requires_worth_gate: true
+    capability: interact_target
+  defend_zone:
+    command: DEFEND_ZONE
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: defend_zone
+  fight_boss:
+    command: FIGHT_TARGET
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: fight_target
+  search_teleporter:
+    command: SEARCH
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: search
+  explore:
+    command: SEARCH
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: search
+
+sentinels:
+  none: { serializes: false, capability_exempt: true }
+  continue_current_action: { serializes: false, capability_exempt: true,
+                             offered_when: active_task_exists }
+
+type_to_verb:
+  chest: open_chest
+  shrine_chance: use_shrine_chance
+  shrine_blood: use_shrine_blood
+  teleporter_idle: start_teleporter
+  teleporter_charging: defend_zone
+  teleporter_charged: advance_stage
