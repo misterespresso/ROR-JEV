@@ -62,7 +62,7 @@ NUMERIC_FIELDS = {
 STOCK_SOURCE: dict[str, str | None] = {
     "objective.phase":                 "OBJECTIVE.objective",
     "economy.gold_band":               "INVENTORY.money",
-    "build.identity":                  "partial: derivable from INVENTORY.items, not yet derived",
+    "build.identity":                  "INVENTORY.items -> brain/build_identity.py (provisional table)",
     "control.active_action":           "action_started/complete events (brain-side)",
     "control.consecutive_failures":    "action_failed events (brain-side)",
     "control":                         "partial: no progress measurement",

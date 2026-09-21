@@ -607,6 +607,47 @@ def trace_replay_pairs_observations():
     check("a stale one does not", len(tk) == 2 and "OBSERVATION" not in tk[1])
 
 
+def trace_dead_asks_nothing():
+    print("\nF32: nothing is asked of a dead character")
+    ad = adapt({"objective": "exploring", "boss_active": False, "scene_name": "blackbeach2"},
+               {"money": 15, "items": []}, {"enemy_count": 0, "nearest_enemy_distance": 999.0},
+               {"interactables": []}, observation_id="o", seq=1,
+               observation=_obs(self__hp=-31.2, self__alive=False))
+    reg = build_registry(ad.raw, set(CAPS), False)
+    req = build_request(ad.banded, reg, BuildContext(CAPS, ad.banded, False, False), CONTRACT)
+    check("dead -> no question at all", req.questions == {}, str(sorted(req.questions)))
+    check("every question recorded as omitted for `dead`",
+          {o["question"] for o in req.omitted} == set(CONTRACT["questions"])
+          and all(o["reason"] == "dead" for o in req.omitted), str(req.omitted)[:200])
+
+
+def trace_build_identity():
+    print("\nbuild.identity: deterministic, from items; unknown when the table cannot tell")
+    from brain.build_identity import ITEMS, TIER_WEIGHT, VOTES, NON_VOTING, derive
+
+    def inv(**kw):
+        return [{"name": k, "count": v} for k, v in kw.items()]
+
+    check("empty inventory is `undefined`", derive([]) == "undefined")
+    check("one white item is `undefined` (below MIN_WEIGHT)", derive(inv(Crowbar=1)) == "undefined")
+    check("utility and scrap never vote",
+          derive(inv(Bandolier=3, ScrapWhite=5)) == "undefined")
+    check("four damage whites are `damage`", derive(inv(Crowbar=2, Syringe=2)) == "damage")
+    check("one red outweighs three whites of another tag",
+          derive(inv(Behemoth=1, ArmorPlate=3)) == "proc")
+    check("an even split is `mixed`, never list order",
+          derive(inv(Crowbar=2, ArmorPlate=2)) == "mixed"
+          and derive(inv(ArmorPlate=2, Crowbar=2)) == "mixed")
+    check("healing and defense both count as `survival`",
+          derive(inv(Tooth=2, Bear=2)) == "survival")
+    check("mostly unrecognised items -> unknown, not a guess",
+          derive(inv(Crowbar=1, NotARealItem=2)) == UNKNOWN)
+    check("string counts are coerced (F11)",
+          derive([{"name": "Crowbar", "count": "4"}]) == "damage")
+    check("every table row uses a known tier and tag",
+          all(t in TIER_WEIGHT and (g in VOTES or g in NON_VOTING) for t, g in ITEMS.values()))
+
+
 def trace_adapter_on_real_recording():
     print("\nReplay: real recorded frames through the real registry")
     rec = Path(__file__).resolve().parents[1] / "recordings" / "human-01"
@@ -653,6 +694,7 @@ TRACES = [
     trace_teleporter_classification, trace_shrine_classification,
     trace_adapter_refuses_to_invent, trace_string_coercion,
     trace_adapter_reads_observation, trace_replay_pairs_observations,
+    trace_dead_asks_nothing, trace_build_identity,
     trace_adapter_on_real_recording,
 ]
 

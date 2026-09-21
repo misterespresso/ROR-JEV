@@ -158,7 +158,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F29 | **The mod blocks repeat damage to the player — in every run, human or AI** | **decided 2026-09-21: config `BlockRepeatDamage`, default off (vanilla)** — fork build 3, deployed. Recordings before build 3 are on the easier game |
 | F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **decided 2026-09-21: narrowed** to `enemies_near`, `nearest_enemy_band`, `boss_active`; unknowns stripped from the wire state |
 | F31 | **`run_suite` reported a crashing test file as PASS** (0 passed, 0 failed) | **fixed** — a crash or a non-zero exit is now a failure |
-| F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | open — needs an `enabled_when` or lifecycle gate |
+| F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | **fixed** — `build_request` asks nothing when `self.hp_band` is `dead` |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1115,6 +1115,11 @@ With build 2's observation, `self.hp_band` can be `dead`, and `next_action` does
 executed on a dead character, but the call costs tokens and records a decision about nothing.
 The fix is a gate, not a declaration: `enabled_when` on `alive`, or the lifecycle suspending the
 tick loop at death.
+
+**Fixed.** One rule in `build_request`, ahead of every question: `hp_band: dead` omits all of them
+with reason `dead`. A global rule rather than an `enabled_when` on each question, because no
+question is meaningful for a dead character and a per-question gate can be forgotten on the next
+one added. fork-06: 3 ticks, all now empty.
 
 ---
 

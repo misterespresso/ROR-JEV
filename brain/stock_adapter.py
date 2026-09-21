@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
 
 #: Every place this adapter is making something up rather than reading it. Kept as data so
@@ -40,6 +41,7 @@ ADAPTER_ASSUMPTIONS = [
     "hp, survivor, elapsed time and hazards come from QUERY_OBSERVATION (fork build 2+) "
     "when the recording has it, and are unknown otherwise; feasibility and nav progress "
     "exist nowhere (F18)",
+    "build.identity is derived from items by a provisional table (brain/build_identity.py)",
     "time_band and hp_band thresholds are provisional (TIME_BANDS_MIN, HP_BANDS); no doc "
     "defines them",
 ]
@@ -352,7 +354,8 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                           "complete" if stock_phase == "teleporter_charged"
                           else "charging" if stock_phase == "charging_teleporter"
                           else "not_started")},
-        "build": {"identity": UNKNOWN, "key_items": [str(i.get("name")) for i in items]},
+        "build": {"identity": derive_identity(items) if inventory else UNKNOWN,
+                  "key_items": [str(i.get("name")) for i in items]},
         "control": {"active_action": None, "progress_band": UNKNOWN,
                     "consecutive_failures": 0, "last_latency_band": UNKNOWN},
         "advisor": None,

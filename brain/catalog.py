@@ -235,6 +235,13 @@ def build_request(
     payload = c["payload"]
     out = BuiltRequest(state=strip_unknown(state), model=c["model"])
 
+    # F32: nothing is asked of a dead character. Every question would be about a body that
+    # cannot act, and `next_action` does not declare `self.hp_band`, so the field contract
+    # alone would let it through.
+    if resolve(state, "self.hp_band") == "dead":
+        out.omitted = [{"question": name, "reason": "dead"} for name in c["questions"]]
+        return out
+
     for name, spec in c["questions"].items():
         cond = str(spec.get("enabled_when", "always"))
         if not evaluate_condition(cond, ctx):

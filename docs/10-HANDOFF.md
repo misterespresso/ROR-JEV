@@ -10,8 +10,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 |---|---|
 | Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
-| Brain | contract implemented; **252 tests passing** (`python -m eval.run_suite`) |
-| Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 447/448 ticks**; the rest still blocked on `build.identity` and feasibility |
+| Brain | contract implemented; **264 tests passing** (`python -m eval.run_suite`) |
+| Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
 | Deployed | **build 3** `AA63B6D3…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
@@ -24,7 +24,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 1 | roam no longer walks off edges (F28) | **yes** — fork-06, stayed on the ground in combat too (user observed) |
 | 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **yes** — fork-06, 516 frames, every check below passes |
 
-| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | deployed `AA63B6D3…` from `36faf23`; **not yet launched** |
+| 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | deployed `AA63B6D3…` from `36faf23`; loads (cfg key written), no run recorded yet |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -49,8 +49,8 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
 
 ## Next steps, in order
 
-1. **Launch build 3 once** and check the cfg gained `BlockRepeatDamage = false` under
-   `[Gameplay]`; the next recording's `HARNESS_START` should say `"block_repeat_damage": false`.
+1. **Build 3 launched: done.** The cfg gained `BlockRepeatDamage = false` under `[Gameplay]`.
+   Still to see: a build-3 recording whose `HARNESS_START` says `"block_repeat_damage": false`.
    The OBSERVATION checks below apply to every later run.
 
    "Sane" means, for frames with `in_run: true`:
@@ -82,11 +82,19 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
    (10 / 25 min) and `HP_BANDS` (0.70 / 0.30, the latter matching the mod's low-health logic);
    no doc defines them, so review them. Hazard fields are named for what the mod measures:
    `in_void_fog`, not `in_hazard_volume`, and `projectiles_near`, not `incoming_projectiles`.
-   Open: F32, `next_action` still sent while dead.
-3. **F32:** gate `next_action` off when `self.hp_band` is `dead`. Small.
-4. `build.identity`: nothing derives it; it blocks `strategy`, `engage_range` and every worth
-   gate. `02-ARCHITECTURE.md` permits a deterministic derivation from items.
-5. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+3. **F32: done.** Nothing is asked of a dead character (`brain/catalog.py`).
+4. **`build.identity`: done, provisional.** `brain/build_identity.py` derives it from items: a
+   table of internal item name → (tier, tag), tier-weighted, dominant tag at ≥ 40 % share, else
+   `mixed`; `undefined` below weight 4; `unknown` if unrecognised items outnumber recognised ones.
+   Vocabulary: `undefined`, `mixed`, `damage`, `crit`, `proc`, `survival`, `mobility`. All 38
+   item names in the recordings are in the table. **Review the table and the cut points** — no
+   doc defines them. Effect on fork-06: `worth_start_teleporter` sendable on the 6 ticks the
+   teleporter is offered, the first worth gate ever sendable. `strategy` and `engage_range` are
+   still blocked, now only on `threat` sub-fields (elite, enemy classes, focus, feasibility).
+5. **Next telemetry: `threat` sub-fields** — `elite_present`, `enemy_classes`, `being_focused`
+   are one mod pass over nearby enemies and unblock `engage_range` (with `run.survivor`); feasibility
+   is the expensive one and gates `strategy` and `engagement_response`.
+6. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 
