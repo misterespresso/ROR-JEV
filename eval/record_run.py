@@ -121,10 +121,15 @@ class RunState:
     scenes: list[str] = field(default_factory=list)
 
 
+#: Fork-only queries. Polled every sweep, recorded when answered, and silently skipped when
+#: the installed mod is stock (which answers with an "Unknown query type" error).
+OPTIONAL_QUERIES = ["QUERY_OBSERVATION"]
+
+
 def poll(p: Probe, st: RunState) -> dict[str, dict]:
     """One full sweep of every query. Recorded by the Probe's reader automatically."""
     got: dict[str, dict] = {}
-    for q in QUERIES:
+    for q in QUERIES + OPTIONAL_QUERIES:
         r = p.query(q)
         if r is None or "error" in r:
             continue

@@ -62,7 +62,7 @@ NUMERIC_FIELDS = {
 STOCK_SOURCE: dict[str, str | None] = {
     "objective.phase":                 "OBJECTIVE.objective",
     "economy.gold_band":               "INVENTORY.money",
-    "build.identity":                  "INVENTORY.items (partial: derivable)",
+    "build.identity":                  "partial: derivable from INVENTORY.items, not yet derived",
     "control.active_action":           "action_started/complete events (brain-side)",
     "control.consecutive_failures":    "action_failed events (brain-side)",
     "control":                         "partial: no progress measurement",
@@ -291,11 +291,18 @@ def main() -> int:
     for q in questions.values():
         all_needed.update(q.get("required_state_fields") or [])
 
-    have = {f for f in all_needed if STOCK_SOURCE.get(f)}
+    # "partial" is NOT available. The brain omits a question if ANY part of a block it
+    # declares is unknown (brain/catalog.py `_telemetry_ok`), so a partially sourced block is
+    # as blocking as a missing one. Counting partial as present is what produced a wrong claim
+    # that time + hazards alone would unblock `next_action` -- `threat` was "partial".
+    def available(f):
+        src = STOCK_SOURCE.get(f)
+        return bool(src) and not str(src).startswith("partial")
+    have = {f for f in all_needed if available(f)}
     missing = sorted(f for f in all_needed if not STOCK_SOURCE.get(f))
     for f in sorted(all_needed):
         src = STOCK_SOURCE.get(f)
-        mark = "ok " if src else "GAP"
+        mark = "ok " if available(f) else ("PRT" if src else "GAP")
         print(f"  [{mark}] {f:<34} {src or 'NO STOCK SOURCE -- needs C#'}")
     print()
 
