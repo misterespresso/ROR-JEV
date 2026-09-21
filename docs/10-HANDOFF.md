@@ -8,7 +8,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 
 | | State |
 |---|---|
-| Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build |
+| Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
 | Brain | contract implemented; **229 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | 10,578 replayed ticks, registry invariants held on every one — and **zero questions sendable** (F18, F30) |
@@ -23,6 +23,12 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 0 | IL-identical to stock | yes — loads, 4/4 hooks bind, stock's query schema |
 | 1 | roam no longer walks off edges (F28) | **no** |
 | 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **no** |
+
+Build 2 also touched `RainflayerPlugin.HealthComponent_TakeDamage` — the same method that holds
+F29's repeat-damage blocking. It notes environmental damage (attacker null or without a
+`CharacterBody`) **before** the blocking check, so a hit that is then cancelled still counts as
+"environmental damage in the last 2 s". That is intended (the hazard is real). Whoever puts F29
+behind config must keep that line above the blocking.
 
 ## Two open decisions (the user has not chosen)
 
@@ -42,10 +48,27 @@ and started the fork, written so the next session does not re-derive any of it. 
    Then confirm `OBSERVATION` frames appear and look sane:
    `python -m eval.inspect_recording --run-id fork-06`. Watch for the character stepping off edges
    *during combat* — combat movement has no edge check (build 1 fixed roam only).
+
+   "Sane" means, for frames with `in_run: true`:
+   - `run.elapsed_s` never decreases within a stage, and stops during pauses
+   - `run.difficulty` is `Easy` (the enum name for Drizzle, not the display name) and
+     `run.survivor` is `CommandoBody`
+   - `0 ≤ self.hp ≤ self.hp_max`, and `self.alive` goes false exactly once, at death
+   - on a quiet stage 1, `hazards.taking_environmental_damage` is false, `active_dots` is empty,
+     and `hostile_projectiles_nearby` is 0 when nothing is shooting
+   - in the lobby: `in_run: false` with `note: "Not in game"`, not a stale snapshot
+
+   **If a build misbehaves in game:** `deploy.py --restore` goes back to *stock*, not to the
+   previous fork build. Build 1's source is commit `e802351` (`deploys.log` predates source
+   logging, so it does not say). Rebuilding it from a clean LF checkout gives an IL-identical DLL
+   with a **different hash** from `CE424B48…`, because build 1 was compiled from CRLF sources
+   (`contract/pinned-build.yaml`, `builds:`). Confirm with `compare_dll` rather than the hash,
+   register the new hash as "build 1, LF rebuild", deploy, then return `mod/` to `master`.
 2. **Get the two decisions above.**
 3. **Adapter: consume `QUERY_OBSERVATION`** in `brain/stock_adapter.py` — band `elapsed_s` →
    `run.time_band`, `hp/hp_max` → `self.hp_band`, fill `run.survivor` and `hazards`. Not done yet;
-   the recorder already polls and records the query.
+   the recorder already polls and records the query. **This does not depend on either decision**
+   — do it while waiting on step 2.
 4. Then, per decision 1, either narrow the catalog declarations or start the expensive telemetry.
 5. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one

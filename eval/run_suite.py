@@ -70,7 +70,8 @@ def main() -> int:
     print("  [NOT IMPLEMENTED]  0 passed, 0 failed, "
           f"{len(INGAME_OWED)} traces owed")
     print(f"      owed: {', '.join(INGAME_OWED)}")
-    print("      blocker: no forked mod exists. Phase 0's go/no-go PASSED against STOCK")
+    print("      blocker: the fork (mod/, builds 0-2) implements no protocol v2 yet, and")
+    print("      builds 1-2 are unverified in game. Phase 0's go/no-go PASSED against STOCK")
     print("      1.1.1 (recordings/gonogo-03 opened a chest end to end), which proves the")
     print("      game and mod stack work -- not that protocol v2's typed targets,")
     print("      lifecycle and token rules behave correctly under Unity.")
@@ -94,7 +95,8 @@ def main() -> int:
           "that is evidence")
     print("                    about STOCK Rainflayer 1.1.1. No protocol v2 conformance "
           "has run in")
-    print("                    game, because no forked mod exists yet.")
+    print("                    game: the fork exists (builds 0-2) but does not speak v2 "
+          "yet.")
     print("=" * 72)
     return 1 if total_f or gen.returncode else 0
 
