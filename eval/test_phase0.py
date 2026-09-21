@@ -648,6 +648,63 @@ def trace_build_identity():
           all(t in TIER_WEIGHT and (g in VOTES or g in NON_VOTING) for t, g in ITEMS.values()))
 
 
+def trace_threat_block():
+    print("\nBuild 4: the mod's threat block fills elite, classes and focus; strategy stays gated")
+    from brain.enemy_class import BODIES, CLASSES, FOCUS_MIN
+
+    def enemy(body, **kw):
+        e = {"body": body, "team": "Monster", "is_elite": False, "is_boss": False,
+             "is_flying": False, "distance": 12.0, "targeting_player": True}
+        e.update(kw)
+        return e
+
+    def threat(enemies, elites=0, targeting=1):
+        return {"radius_m": 50, "enemy_count": len(enemies), "elite_count": elites,
+                "boss_count": 0, "targeting_player_count": targeting,
+                "listed": len(enemies), "enemies": enemies}
+
+    stock = ({"objective": "exploring", "boss_active": False, "scene_name": "blackbeach2"},
+             {"money": 15, "items": [{"name": "Crowbar", "count": 4}]},
+             {"enemy_count": 2, "nearest_enemy_distance": 12.0}, {"interactables": []})
+
+    def run(th):
+        o = _obs()
+        if th is not None:
+            o["threat"] = th
+        ad = adapt(*stock, observation_id="o", seq=1, observation=o)
+        reg = build_registry(ad.raw, set(CAPS), False)
+        return ad.banded["threat"], build_request(
+            ad.banded, reg, BuildContext(CAPS, ad.banded, False, False), CONTRACT)
+
+    t, req = run(threat([enemy("BeetleBody"), enemy("WispBody", is_flying=True)]))
+    check("classes are named, sorted and de-duplicated",
+          t["enemy_classes"] == ["flying_ranged", "melee_swarm"], str(t["enemy_classes"]))
+    check("no elites -> elite_present false", t["elite_present"] is False)
+    check("one enemy targeting is not `being_focused`", t["being_focused"] is False)
+    check("engage_range is now sendable (survivor + identity + classes)",
+          "engage_range" in req.questions, str(req.omitted))
+    check("strategy still omitted: feasibility is still unknown",
+          "strategy" not in req.questions)
+
+    t, _ = run(threat([enemy("GolemBody", is_boss=True)], elites=1, targeting=FOCUS_MIN))
+    check("the boss flag wins over the body's own class", t["enemy_classes"] == ["boss"])
+    check("an elite count sets elite_present", t["elite_present"] is True)
+    check(f"{FOCUS_MIN} targeting is `being_focused`", t["being_focused"] is True)
+
+    t, req = run(threat([enemy("BeetleBody"), enemy("NoSuchBody"), enemy("OtherBody")]))
+    check("mostly unrecognised bodies -> classes unknown, not a partial list",
+          t["enemy_classes"] == UNKNOWN)
+    check("so engage_range is omitted", "engage_range" not in req.questions)
+
+    t, _ = run(threat([]))
+    check("no enemies is a measured empty list", t["enemy_classes"] == [])
+
+    t, _ = run(None)
+    check("a build-2 frame (no threat block) leaves the three unknown",
+          all(t[k] == UNKNOWN for k in ("elite_present", "enemy_classes", "being_focused")))
+    check("every table row uses a known class", set(BODIES.values()) <= set(CLASSES))
+
+
 def trace_adapter_on_real_recording():
     print("\nReplay: real recorded frames through the real registry")
     rec = Path(__file__).resolve().parents[1] / "recordings" / "human-01"
@@ -694,7 +751,7 @@ TRACES = [
     trace_teleporter_classification, trace_shrine_classification,
     trace_adapter_refuses_to_invent, trace_string_coercion,
     trace_adapter_reads_observation, trace_replay_pairs_observations,
-    trace_dead_asks_nothing, trace_build_identity,
+    trace_dead_asks_nothing, trace_build_identity, trace_threat_block,
     trace_adapter_on_real_recording,
 ]
 

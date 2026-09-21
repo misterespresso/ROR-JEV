@@ -92,6 +92,15 @@ OBSERVATION_SOURCE: dict[str, str] = {
 }
 
 
+#: What fork build 4 adds to the OBSERVATION: the `threat` block. Credited only when a
+#: recording's frames contain it; build-2 and build-3 frames do not.
+OBSERVATION_THREAT_SOURCE: dict[str, str] = {
+    "threat.elite_present": "OBSERVATION.threat.elite_count (build 4+)",
+    "threat.enemy_classes": "OBSERVATION.threat.enemies[].body -> brain/enemy_class.py (build 4+)",
+    "threat.being_focused": "OBSERVATION.threat.targeting_player_count (build 4+)",
+}
+
+
 def _type_of(v) -> str:
     if v is None:
         return "null"
@@ -310,6 +319,8 @@ def main() -> int:
     # that time + hazards alone would unblock `next_action` -- `threat` was "partial".
     if schema.counts.get("OBSERVATION"):
         STOCK_SOURCE.update(OBSERVATION_SOURCE)
+    if "threat" in schema.fields.get("OBSERVATION", {}):
+        STOCK_SOURCE.update(OBSERVATION_THREAT_SOURCE)
 
     def available(f):
         src = STOCK_SOURCE.get(f)

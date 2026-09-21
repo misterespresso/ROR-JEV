@@ -32,6 +32,12 @@ namespace Rainflayer
         /// <summary>Hostile projectiles counted within this radius of the player.</summary>
         const float PROJECTILE_RADIUS_M = 15f;
 
+        /// <summary>Enemies counted within this radius -- the same 50 m stock COMBAT_STATUS uses.</summary>
+        const float THREAT_RADIUS_M = 50f;
+
+        /// <summary>At most this many enemies are listed (nearest first); the counts cover all of them.</summary>
+        const int THREAT_LIST_MAX = 16;
+
         /// <summary>FindObjectsOfType is too expensive per snapshot; refresh the fog list this often.</summary>
         const float FOG_CACHE_S = 5f;
 
@@ -110,7 +116,82 @@ namespace Rainflayer
             top.Add(P("run", "{" + string.Join(",", runFields) + "}"));
             top.Add(P("self", "{" + string.Join(",", selfFields) + "}"));
             top.Add(P("hazards", "{" + string.Join(",", hazardFields) + "}"));
+            top.Add(P("threat", Threat(body)));
             return "{" + string.Join(",", top) + "}";
+        }
+
+        /// <summary>
+        /// Raw threat facts, no judgment: which bodies, how far, elite or boss, and whether each
+        /// one's AI is currently targeting the player. Classification into enemy classes, and
+        /// banding "being focused", are the brain's job (brain/stock_adapter.py) so the tables
+        /// behind them can be reviewed without a rebuild.
+        ///
+        /// Hostile = alive, and on any team other than the player's -- the same rule stock
+        /// COMBAT_STATUS uses, plus the alive check it lacks. `team` is sent so the brain can
+        /// see what that rule includes.
+        /// </summary>
+        static string Threat(CharacterBody body)
+        {
+            var ourTeam = body.teamComponent.teamIndex;
+            var me = body.gameObject;
+            var found = new List<KeyValuePair<float, CharacterBody>>();
+            int elites = 0, bosses = 0, targeting = 0;
+
+            foreach (var other in CharacterBody.readOnlyInstancesList)
+            {
+                if (other == null || other == body || other.teamComponent == null
+                    || other.teamComponent.teamIndex == ourTeam
+                    || other.healthComponent == null || !other.healthComponent.alive)
+                    continue;
+                float d = Vector3.Distance(body.corePosition, other.corePosition);
+                if (d > THREAT_RADIUS_M)
+                    continue;
+                found.Add(new KeyValuePair<float, CharacterBody>(d, other));
+                if (other.isElite) elites++;
+                if (other.isBoss) bosses++;
+                if (Targets(other, me)) targeting++;
+            }
+            found.Sort((x, y) => x.Key.CompareTo(y.Key));
+
+            var list = new List<string>();
+            for (int i = 0; i < found.Count && i < THREAT_LIST_MAX; i++)
+            {
+                var b = found[i].Value;
+                list.Add("{" + string.Join(",", new[]
+                {
+                    P("body", S(BodyCatalog.GetBodyName(b.bodyIndex) ?? "")),
+                    P("team", S(b.teamComponent.teamIndex.ToString())),
+                    P("is_elite", B(b.isElite)),
+                    P("is_boss", B(b.isBoss)),
+                    P("is_flying", B(b.isFlying)),
+                    P("distance", F(found[i].Key)),
+                    P("targeting_player", B(Targets(b, me))),
+                }) + "}");
+            }
+
+            return "{" + string.Join(",", new[]
+            {
+                P("radius_m", F(THREAT_RADIUS_M)),
+                P("enemy_count", found.Count.ToString(CultureInfo.InvariantCulture)),
+                P("elite_count", elites.ToString(CultureInfo.InvariantCulture)),
+                P("boss_count", bosses.ToString(CultureInfo.InvariantCulture)),
+                P("targeting_player_count", targeting.ToString(CultureInfo.InvariantCulture)),
+                P("listed", list.Count.ToString(CultureInfo.InvariantCulture)),
+                P("enemies", "[" + string.Join(",", list) + "]"),
+            }) + "}";
+        }
+
+        /// <summary>True if any of the body's AIs has the player as its current enemy.</summary>
+        static bool Targets(CharacterBody other, GameObject player)
+        {
+            var master = other.master;
+            if (master == null)
+                return false;
+            // CharacterMaster.aiComponents is not public in this build; the AIs sit on the master.
+            foreach (var ai in master.GetComponents<RoR2.CharacterAI.BaseAI>())
+                if (ai != null && ai.currentEnemy != null && ai.currentEnemy.gameObject == player)
+                    return true;
+            return false;
         }
 
         static List<string> ActiveDots(CharacterBody body)

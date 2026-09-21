@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 
 from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
+from .enemy_class import band_threat
 
 #: Every place this adapter is making something up rather than reading it. Kept as data so
 #: a replay report can print it, because a reader who does not know these is being misled.
@@ -41,6 +42,9 @@ ADAPTER_ASSUMPTIONS = [
     "hp, survivor, elapsed time and hazards come from QUERY_OBSERVATION (fork build 2+) "
     "when the recording has it, and are unknown otherwise; feasibility and nav progress "
     "exist nowhere (F18)",
+    "enemy classes and being_focused are banded from build 4's threat block by a provisional "
+    "table (brain/enemy_class.py); raw threat.enemies stays empty -- the mod sends no "
+    "entity IDs, so fight_boss cannot target them (F17)",
     "build.identity is derived from items by a provisional table (brain/build_identity.py)",
     "time_band and hp_band thresholds are provisional (TIME_BANDS_MIN, HP_BANDS); no doc "
     "defines them",
@@ -142,6 +146,8 @@ def from_observation(obs: dict | None) -> dict | None:
                  "barrier_band": UNKNOWN if barrier is None
                  else ("none" if barrier <= 0 else "some")},
         "hazards": hazards,
+        # Build 4+: elite, class and focus facts. None on older frames -> stay unknown.
+        "threat": band_threat(obs.get("threat")),
     }
 
 
@@ -368,6 +374,8 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         out.banded["run"].update(ob["run"])
         out.banded["self"].update(ob["self"])
         out.banded["hazards"] = ob["hazards"]
+        if ob["threat"]:
+            out.banded["threat"].update(ob["threat"])
         out.raw.update({k: observation[k] for k in ("run", "self", "hazards")
                         if k in observation})
     return out
