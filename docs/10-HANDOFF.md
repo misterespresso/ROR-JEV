@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **347 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 16** `C58B8605…` (`python tools/deploy.py --status`) |
+| Deployed | **build 17** `C7CA0643…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -37,7 +37,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 13 | `TARGET_PRIORITY`: JEV chooses who to shoot (F34) | **yes** — jev-09 sent both `nearest` and `clear_adds` |
 | 14 | Arrival fix + give-up report (F46); barrels in passing (F47) | **yes** — jev-10, jev-11 |
 | 15 | Barrel reflex 6 m | **yes** — jev-12 |
-| 16 | Fire while travelling (F50) | **deployed** `C58B8605…` from `cd78f48`; not yet run |
+| 16 | Fire while travelling (F50) | **yes** — jev-13 |
+| 17 | Seen-only interactables; loot watch (F52, F53) | **deployed** `C7CA0643…` from `64a6826`; not yet run |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -151,7 +152,8 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    jev-11: no run had ever left stage 1 (F49, fixed: stage clock, difficulty band, what is left).
    jev-12: walked into enemies without shooting (F50) and hunted the teleporter while broke
    (F51) -- both fixed. Decisions now every 1 s (505 ms median answer, ~$0.43/hour).
-   Next: run jev-13 -- watch for a stage actually ending. Open: F38 (save the roll),
+   jev-13: walked to a chest it could not have seen (F52) and left loot when leaving (F53) --
+   both fixed in build 17. Next: run jev-14 -- watch for a stage actually ending. Open: F38 (save the roll),
    path feasibility, `strategy`/`engagement_response` still unsendable. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
    Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
    request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
