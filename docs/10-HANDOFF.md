@@ -10,7 +10,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 |---|---|
 | Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
-| Brain | contract implemented; **291 tests passing** (`python -m eval.run_suite`) |
+| Brain | contract implemented; **304 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
 | Deployed | **build 7** `CF618C83…` (`python tools/deploy.py --status`) |
@@ -29,6 +29,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **no falls** — fork-09 (6 min, Verdant Falls, 274 frames with enemies, 0 environmental damage); minor stalls on terrain, recovered; accepted — no more movement tuning |
 | 6 | `OBSERVATION` gains `interactables`: every purchase and barrel on the stage, instance IDs, cost type, shop/printer items | **yes** — fork-10: all 17 stage interactables, printer items; fork-11: **barrels found** (5 per frame; fork-10's stage had none), 3 shop terminals with items |
 | 7 | Edge check walks drops ≤ 8 m; after 2 s cornered, escapes over the shortest drop (fork-10 was stuck a minute on a dome) | **deployed** `CF618C83…` from `74f106b`; not yet run |
+| 8 | `INTERACT_ID <instance id>`: go to the one object JEV picked and interact; events labelled `INTERACT_ID:<id>` | built from `ff93341`; **not deployed** (game was running) |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -129,9 +130,19 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    **Then: verbs** for the new types. Barrels are free -- the easiest first one. Terminals revive
    the deferred `shop_item_pick`. Whether the mod's interact command can open each type (it skips
    lunar pods and equipment barrels as "require pressing E") needs an in-game check.
-7. **F34 — target priority as a JEV decision**, plus readable item effects. After build 6.
-8. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.
-9. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+7. **JEV drives: built, not yet run in game.** `python -m eval.jev_run --run-id jev-01 --survivor
+   Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
+   request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
+   → the game. `--dry-run` asks JEV and sends nothing. Records `JEV_EXCHANGE` (request, answers,
+   usage, latency) and `HARNESS_DECISION` (`jev:` provenance) frames. First real call (fork-11
+   tick): 506 ms, **1,782 input tokens** -- the ground truth C8 wanted; the estimate was 866-1,154.
+   Known limits: while a targeted task runs, `next_action` is not re-asked (the dispatcher only
+   fills a free slot; `continue_is_worthwhile` needs `control.progress_band`, which nothing
+   measures), so JEV cannot change its mind mid-walk -- a 30 s timeout bounds it. `fight_boss`,
+   `DISENGAGE` and equipment have no fork command yet and are recorded as unsupported.
+8. **F34 — target priority as a JEV decision**, plus readable item effects. After build 6.
+9. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.
+10. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 
