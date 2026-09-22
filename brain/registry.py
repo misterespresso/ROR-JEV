@@ -136,6 +136,10 @@ def build_registry(
         if verb is None:
             continue
         if VERBS[verb][2] and not in_range:     # range-gated but out of range
+            # jev-15: walking to something unaffordable ends in declining it on arrival, and
+            # those options split the vote away from the ones that can actually be taken.
+            if str(it.get("cost_type")) == "gold" and (it.get("cost") or 0) > 0                     and not it.get("affordable", True):
+                continue
             verb = "navigate"
 
         command, commitment, range_gated, worth, cap = VERBS[verb]

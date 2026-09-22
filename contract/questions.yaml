@@ -32,7 +32,9 @@ game_primer:
   - "A stage ends only by starting the teleporter, surviving the boss, and leaving through it. Staying on one stage forever makes every later fight harder and finishes nothing."
   - "Once `objective.unopened_left_here` is nothing -- the stage is picked clean -- and health is good, starting the teleporter is usually the right move. `run.stage_time_band` says how long this stage has taken: fresh, settled, or overdue."
   - "The character knows only what it has seen: chests, shrines and drones it has come within sight of. Exploring reveals more, so `objective.unopened_left_here` being nothing can mean the stage is picked clean, or that little of it has been walked yet -- `run.stage_time_band` tells them apart."
-  - "`objective.unopened_left_here` counts what is still unopened here; `objective.affordable_left_here` counts what the character can pay for right now. Chests it cannot afford yet are a reason to fight for gold, not a reason to leave."
+  - "`objective.unopened_left_here` counts what is still unopened here; `objective.affordable_left_here` counts what the character can pay for right now."
+  - "The teleporter boss scales with run time too: the same boss is weaker now than it will be after another few minutes on this stage. Waiting does not make the fight easier."
+  - "Chests the character cannot afford are worth a little more fighting for gold, but not a long stay: once `run.stage_time_band` is overdue and `objective.affordable_left_here` is nothing, what is left here is not worth the difficulty that waiting adds. Start the teleporter."
 
 questions:
 
@@ -384,10 +386,11 @@ payload:
         instructions: >-
           Is starting the boss event at teleporter `{entity_id}` worth it right now, given
           `self.hp_band`, `build.identity`, `run.time_band`, `run.stage_time_band` and
-          `objective.unopened_left_here` and `objective.affordable_left_here`? The stage ends
-          only through the teleporter, and
-          waiting has its own cost: `run.difficulty_band` rises with time, so the boss and
-          every later stage get harder the longer this one lasts.
+          `objective.unopened_left_here` and `objective.affordable_left_here`? Weigh starting
+          now against staying longer: the stage ends only through the teleporter, and waiting
+          has its own cost -- `run.difficulty_band` rises with run time, so the boss and every
+          later stage get harder the longer this one lasts. A stage the character has already
+          picked over is finished whether or not something unaffordable is still standing in it.
         criteria:
           "true": "The character is ready for the boss and the run gains from starting now."
           "false": "More preparation is worth the time it costs."

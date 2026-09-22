@@ -392,6 +392,8 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         ilist.append({
             "entity_id": eid, "type": mapped, "display_name": it.get("name"),
             "cost": num(it.get("cost"), 0), "cost_type": "gold",
+            "affordable": (gold is not None
+                           and gold >= (num(it.get("cost"), 0) or 0)),
             "locked": bool(it.get("locked")), "distance": dist,
             "in_interaction_range": in_range,
             # A token for an entity whose ID is not stable is not a real token. Supplied so
@@ -428,6 +430,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
             ilist.append({
                 "entity_id": eid, "type": rtype, "kind": t, "display_name": it.get("display"),
                 "item": item, "item_hidden": bool(it.get("shop_hidden")),
+                "affordable": (gold is not None and cost is not None and gold >= cost),
                 "cost": cost, "cost_type": COST_TYPES.get(str(it.get("cost_type")),
                                                         str(it.get("cost_type")).lower()),
                 "locked": False, "distance": dist, "in_interaction_range": in_range,

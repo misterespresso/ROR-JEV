@@ -179,6 +179,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F50 | **The character never shot while travelling**: it walked into enemies and took the hits | **fixed in build 16** — aim and fire while the pathfinder steers |
 | F51 | **Broke at stage start read as "stage finished"**, so JEV went straight for the teleporter | **fixed** — `objective.unopened_left_here` separate from what is affordable |
 | F54 | **Walked to a drone six times and never repaired it**: the option said nothing about what the drone does, and argued against itself | **fixed** — a kind per drone with what it does; neutral text; walks to a repeatedly-declined target withheld |
+| F55 | **Still would not start the teleporter** (worth 0.64 of 0.75): unaffordable chests kept the stage looking unfinished and split the vote | **fixed** — no walks to what it cannot pay for; boss scaling and "picked over" stated |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1481,6 +1482,29 @@ Re-asked on jev-14's own ticks, the ones where it declined: **repair_drone 0.63-
 Second, structural: after `DECLINE_LIMIT` (3) ticks of passing over an action it is in range of,
 walking back to that object is withheld for 60 s. Whatever JEV prefers, the arrive-decline-drift-
 return cycle ends.
+
+
+### F55 — The teleporter, again: not understood as the way forward
+
+jev-15 (build 17): 537 ticks, 10 minutes, never left stage 1. F49's state helped --
+`worth_start_teleporter` reached **0.64**, up from 0.31 -- but not past 0.75, and JEV's picks of
+`start_teleporter` sat at 0.44-0.50 against the 0.55 an irreversible action needs. `explore` won
+230 ticks.
+
+Two causes, both about offering choices that were not really choices:
+
+- **Walks to things it could not pay for.** With `affordable_left_here: nothing`, most options
+  were walks to unaffordable chests -- each one would be declined on arrival (F54's cycle), and
+  together they split the vote away from the actions that could be taken. The registry no longer
+  offers a walk to a gold-priced target the character cannot afford.
+- **"Something is still standing here" read as "the stage is unfinished."** The primer now says
+  a picked-over stage is finished whether or not something unaffordable remains, and that the
+  teleporter boss scales with run time too -- the same boss is weaker now than after another few
+  minutes, so waiting does not make the fight easier.
+
+Re-asked on jev-15's own stalled ticks: **worth 0.78-0.80** (needs above 0.75) with the pick at
+0.69-0.76 (needs 0.55) -- authorised. Before these changes the same ticks gave worth 0.51-0.75 and
+picks of 0.39-0.55.
 
 ---
 
