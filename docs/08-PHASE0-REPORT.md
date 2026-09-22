@@ -171,6 +171,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F42 | **Dropped items were left on the ground**: the pickup set a nav target every JEV command overwrote | **fixed in build 10** — pickup reflex that runs first |
 | F43 | **Equipment was picked up and never used**: nothing reported readiness or fired it | **fixed in build 10** — readiness in OBSERVATION, `USE_EQUIPMENT`, equipment table; capability pulled into milestone 1 |
 | F44 | **Arrive, drift, walk back**; and JEV could not change its mind mid-walk | **fixed** — build 11 holds at the destination; loop decides on task end and redirects walks |
+| F45 | **Combat target thrash and shots into walls**: target re-picked every frame; lenient multi-height LOS | **fixed in build 12** — target lock; clear-shot ray from the aim origin |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1321,6 +1322,20 @@ Fixed: build 11 holds still at a `GOTO_ID` destination for up to 3 s or until th
 (fighting if an enemy comes within 10 m); the loop decides immediately when the current task's
 terminal event arrives instead of at the next tick; and a walk is redirected when JEV picks the
 same other walk or interaction two ticks running at p >= 0.5 (flickers do not redirect).
+
+
+### F45 — Two shots, swap target, repeat; shots into walls
+
+jev-07 (build 11): the person watching saw the character shoot an enemy twice, swap to another,
+repeat, and fire into walls. Not the JEV loop -- it sent 15 commands in 115 s, 2 of them
+`MODE combat`, 1 redirect. The mod's own targeting: `FindBestTarget` re-picks from scratch every
+frame, and its only stickiness is +40 for an enemy within 10 degrees of the crosshair, which the
+smoothed aim loses the moment it starts to turn. And line of sight passed if ANY of four rays, at
+heights up to 2 m above the eye, cleared -- over a waist-high wall, which the bullets then hit.
+
+Fixed in build 12: a target lock (kept until the target dies, leaves 50 m, or has had no clear
+shot for 0.5 s), and combat line of sight is one ray from `body.aimOrigin` to the enemy's
+centre. Which enemy to lock onto stays F34's question.
 
 ---
 

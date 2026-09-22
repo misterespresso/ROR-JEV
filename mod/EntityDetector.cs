@@ -693,6 +693,14 @@ namespace Rainflayer
             return false;
         }
 
+        /// <summary>ROR-JEV (build 12): nothing but air between the aim origin and the point.</summary>
+        public bool HasClearShot(CharacterBody body, Vector3 point)
+        {
+            Vector3 from = body.aimOrigin;
+            Vector3 d = point - from;
+            return !Physics.Raycast(from, d.normalized, d.magnitude, LayerMask.GetMask("World"));
+        }
+
         /// <summary>
         /// Find the best target based on threat priority.
         /// Considers distance, threat level (boss/elite), health, and current aim.
@@ -754,8 +762,10 @@ namespace Rainflayer
                 if (fovDegrees < 360f && !IsInFieldOfView(body.corePosition, aimDirection, enemyPosition, fovDegrees))
                     continue;
 
-                // Line of sight check (if required)
-                if (requireLineOfSight && !HasLineOfSight(eyePosition, enemyPosition))
+                // Line of sight check (if required). ROR-JEV (build 12, jev-07): the lenient
+                // multi-height check passed over waist-high walls the bullets then hit. Combat
+                // uses one ray from where shots actually leave to the enemy's centre.
+                if (requireLineOfSight && !HasClearShot(body, enemyPosition))
                     continue;
 
                 // Calculate threat score

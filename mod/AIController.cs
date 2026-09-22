@@ -917,6 +917,33 @@ namespace Rainflayer
             }
         }
 
+        private GameObject lockedTarget;
+        private float lockedLosLostAt = -1f;
+        private const float TARGET_LOS_GRACE_S = 0.5f;
+        private const float TARGET_MAX_RANGE = 50f;
+
+        private GameObject LockTarget(CharacterBody body, GameObject best)
+        {
+            if (lockedTarget != null)
+            {
+                var lb = lockedTarget ? lockedTarget.GetComponent<CharacterBody>() : null;
+                bool alive = lb != null && lb.healthComponent != null && lb.healthComponent.alive;
+                bool inRange = alive && Vector3.Distance(body.corePosition, lb.corePosition) <= TARGET_MAX_RANGE;
+                bool clear = inRange && entityDetector.HasClearShot(body, lb.corePosition);
+                if (clear)
+                    lockedLosLostAt = -1f;
+                else if (inRange && lockedLosLostAt < 0f)
+                    lockedLosLostAt = Time.time;
+                bool keep = inRange && (clear || Time.time - lockedLosLostAt < TARGET_LOS_GRACE_S);
+                if (keep)
+                    return lockedTarget;
+                lockedTarget = null;
+                lockedLosLostAt = -1f;
+            }
+            lockedTarget = best;
+            return best;
+        }
+
         private float arrivalHoldUntil;
         private const float ARRIVAL_HOLD_S = 3f;
 
@@ -1494,6 +1521,10 @@ namespace Rainflayer
                         fovDegrees: 360f,   // 360 degree detection (can hear enemies)
                         requireLineOfSight: true  // MUST have LOS to attack
                     );
+                    // ROR-JEV (build 12, jev-07): re-picking every frame swapped targets after a
+                    // shot or two. Keep the locked target until it dies, leaves range, or has had
+                    // no clear shot for TARGET_LOS_GRACE_S; only then take the new best.
+                    target = LockTarget(body, target);
 
                     // CRITICAL: Validate target BEFORE accessing any properties
                     // Unity objects can appear "not null" even when destroyed
