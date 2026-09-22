@@ -226,6 +226,9 @@ namespace Rainflayer
             if (!RainflayerPlugin.EnableAIControl.Value)
                 return;
 
+            // ROR-JEV (build 11): a new command ends any arrival hold.
+            arrivalHoldUntil = 0f;
+
             try
             {
                 switch (command)
@@ -914,6 +917,9 @@ namespace Rainflayer
             }
         }
 
+        private float arrivalHoldUntil;
+        private const float ARRIVAL_HOLD_S = 3f;
+
         private GameObject pickupReflexTarget;
         private float pickupReflexUntil;
         private const float PICKUP_REFLEX_RANGE = 12f;
@@ -1132,6 +1138,16 @@ namespace Rainflayer
                 if (entityDetector != null && TryPickupReflex(body))
                     return;
 
+                // === ROR-JEV (build 11): HOLD AT A GOTO_ID DESTINATION ===
+                // Stand still until the next command or ARRIVAL_HOLD_S, unless an enemy is close
+                // enough that standing still is worse than fighting.
+                if (Time.time < arrivalHoldUntil && !navigationController.isNavigating
+                    && entityDetector != null && entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE) == 0)
+                {
+                    body.inputBank.moveVector = Vector3.zero;
+                    return;
+                }
+
                 // === PHASE 2.5: AUTOMATIC DROPPED ITEM PICKUP ===
                 // Check for nearby dropped items and automatically collect them
                 // Priority: Only pick up items when not in combat or waiting for chest pickup
@@ -1297,6 +1313,9 @@ namespace Rainflayer
                             socketBridge?.SendEvent("action_complete",
                                 ("command", $"GOTO_ID:{navigationController.gotoInteractable.Name}"),
                                 ("status", "success"));
+                            // jev-06: roam/combat carried the character off before the brain's
+                            // next decision reached it, so it walked back -- four times, one chest.
+                            arrivalHoldUntil = Time.time + ARRIVAL_HOLD_S;
                             navigationController.isNavigating = false;
                             navigationController.gotoTarget = null;
                             navigationController.gotoInteractable = null;

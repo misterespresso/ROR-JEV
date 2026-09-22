@@ -49,6 +49,12 @@ USD_PER_INPUT_TOKEN = 0.042 / 1_000_000
 TASK_TIMEOUT_S = {"GOTO_ID": 60.0}
 TASK_TIMEOUT_DEFAULT_S = 30.0
 
+#: jev-06: JEV preferred another target for 40 s of a 42 s walk and could not say so. A walk is
+#: redirected when JEV picks the SAME other walk/interaction this many ticks running, each at
+#: least REDIRECT_MIN_P -- enough to follow a real change of mind, not every flicker.
+REDIRECT_TICKS = 2
+REDIRECT_MIN_P = 0.50
+
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
 
@@ -140,10 +146,18 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     tokens = 0
     last_line = 0.0
     last_choice = "-"
+    redirect = {"to": None, "n": 0}
 
     while not stop["flag"] and not p.lost and time.monotonic() < t_end:
         now = time.monotonic()
         if now < t_next:
+            # jev-06: a task ending mid-wait used to be noticed only at the next tick, after the
+            # mod had carried the character away from the chest it just reached. Decide now.
+            if task and any(str(ev.get("command")) == task.label
+                            and str(ev.get("event_type")) in ("action_complete", "action_failed")
+                            for ev in p.events[seen_events:]):
+                t_next = now
+                continue
             time.sleep(0.05)
             continue
         t_next = now + a.decide_every
@@ -210,6 +224,23 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         rec.record({"type": "JEV_EXCHANGE", "tick": n, "request": req.wire(),
                     "omitted": req.omitted, "answers": res.answers, "usage": res.usage,
                     "latency_ms": round(res.latency_ms, 1)})
+
+        # --- redirect a walk JEV no longer wants (jev-06) ---------------------------------
+        sel0 = res.answers.get("next_action") or {}
+        pick = str(sel0.get("choice") or "")
+        p_pick = float((sel0.get("probabilities") or {}).get(pick, 0.0))
+        other = (task is not None and task.label.startswith("GOTO_ID:") and life.task is not None
+                 and pick in reg and pick != life.task.action_id
+                 and pick.split(":")[0] not in ("fight_nearby", "explore")
+                 and p_pick >= REDIRECT_MIN_P)
+        redirect = ({"to": pick, "n": redirect["n"] + 1 if redirect["to"] == pick else 1}
+                    if other else {"to": None, "n": 0})
+        if redirect["n"] >= REDIRECT_TICKS:
+            rec.record({"type": "HARNESS_NOTE", "note": "task_redirected", "from": task.label,
+                        "to": pick, "p": round(p_pick, 2)})
+            life.on_event(task.command_id, State.CANCELLED, f"redirected to {pick}")
+            task = None
+            redirect = {"to": None, "n": 0}
 
         # --- dispatch and execute --------------------------------------------------------
         d = dispatch(ad.raw, res.answers, reg, life, set(caps))

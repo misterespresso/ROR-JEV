@@ -170,6 +170,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F41 | **Category chests were one kind** (Damage/Healing/Utility indistinguishable), and cost read 'expensive' against a fixed 25 gold | **fixed** — six variant kinds that say what they guarantee; cost banded against gold on hand |
 | F42 | **Dropped items were left on the ground**: the pickup set a nav target every JEV command overwrote | **fixed in build 10** — pickup reflex that runs first |
 | F43 | **Equipment was picked up and never used**: nothing reported readiness or fired it | **fixed in build 10** — readiness in OBSERVATION, `USE_EQUIPMENT`, equipment table; capability pulled into milestone 1 |
+| F44 | **Arrive, drift, walk back**; and JEV could not change its mind mid-walk | **fixed** — build 11 holds at the destination; loop decides on task end and redirects walks |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1302,6 +1303,24 @@ each does and when a use has a target at all (`enemies` within 30 m / `hurt` / `
 `never` -- the Fuel Array); the capability moves to phase 2 and milestone 1 by decision. On a real
 jev-05 tick with a ready Fruit: not asked at full health, noul 0.69 at 60 % (fires above 0.65),
 0.74 at 15 %.
+
+
+### F44 — Arrive, drift away, walk back; and no change of mind mid-walk
+
+jev-06 (build 10), "oscillating between chest and terminal". Two causes in the recording:
+
+- **Arrive-drift-return (122-140 s).** `GOTO_ID` completed at a chest; JEV, asked while standing
+  there, chose `open_chest` at 0.94-1.00 -- but the tick had started before the completion event
+  arrived, so the walk still held the slot and nothing was sent. By the next tick (2 s) the mod's
+  standing roam/combat had carried the character to "mid" range, so JEV sent it back. Four times
+  on one chest.
+- **No change of mind (79-120 s).** A 42 s walk to a far small chest; for 40 s of it JEV preferred
+  the Utility chest (0.6-0.78) and at moments the terminal it passed, none of it sendable.
+
+Fixed: build 11 holds still at a `GOTO_ID` destination for up to 3 s or until the next command
+(fighting if an enemy comes within 10 m); the loop decides immediately when the current task's
+terminal event arrives instead of at the next tick; and a walk is redirected when JEV picks the
+same other walk or interaction two ticks running at p >= 0.5 (flickers do not redirect).
 
 ---
 

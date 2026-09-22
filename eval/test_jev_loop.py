@@ -227,6 +227,43 @@ def trace_equipment():
     check("a confident yes fires it", ("USE_EQUIPMENT", "") in p.commands, str(p.commands))
 
 
+def trace_redirect():
+    print("\njev-06: a walk is redirected when JEV wants another target two ticks running")
+    far = frames(True)
+    far["QUERY_OBSERVATION"]["interactables"]["items"][-1]["distance"] = 40.0     # chest: walk
+    far["QUERY_OBSERVATION"]["interactables"]["items"][0]["distance"] = 25.0      # barrel: walk
+
+    def scripted(picks):
+        answers = iter(picks)
+
+        def fake(wire, **_kw):
+            want = next(answers, "none")
+            opts = wire["questions"]["next_action"]["criteria"]
+            choice = next((k for k in opts if want in k), "none")
+            return JevResult(answers={"next_action": {"type": "choice", "choice": choice,
+                                                      "confidence": 0.9, "probabilities": {choice: 0.8}}},
+                             usage={"input_tokens": 1}, latency_ms=1.0, model="stub")
+        return fake
+
+    def go(picks):
+        jev_run.ask = scripted(picks)
+        stop = {"flag": False}
+        p, rec = FakeProbe([far] * len(picks), stop), FakeRec()
+        a = types.SimpleNamespace(run_id="t", minutes=1.0, decide_every=0.0, dry_run=False)
+        from brain.catalog import load_contract
+        from eval.fixtures import MILESTONE_1_CAPABILITIES
+        jev_run.loop(p, rec, a, load_contract(), frozenset(MILESTONE_1_CAPABILITIES), stop)
+        return p, rec
+
+    p, rec = go(["chest_small", "barrel", "barrel", "barrel"])
+    gotos = [c for c in p.commands if c[0] == "GOTO_ID"]
+    check("walk to the chest, then redirected to the barrel", gotos == [("GOTO_ID", str(CHEST)), ("GOTO_ID", "-97000")], str(gotos))
+    check("the redirect is recorded", any(f.get("note") == "task_redirected" for f in rec.frames))
+    p, rec = go(["chest_small", "barrel", "chest_small", "barrel"])
+    gotos = [c for c in p.commands if c[0] == "GOTO_ID"]
+    check("a flicker (not two ticks running) does not redirect", gotos == [("GOTO_ID", str(CHEST))], str(gotos))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -238,7 +275,7 @@ def trace_dead_asks_nothing():
 if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
-              trace_equipment, trace_dead_asks_nothing):
+              trace_equipment, trace_redirect, trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
