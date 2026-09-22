@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **337 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 12** `C36AC0A4…` (`python tools/deploy.py --status`) |
+| Deployed | **build 13** `667F6201…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -34,6 +34,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 10 | Pickup reflex (F42); `self.equipment` readiness + `USE_EQUIPMENT` (F43) | **yes** — jev-06 (and exposed F44) |
 | 11 | Hold still at a `GOTO_ID` destination (F44) | **yes** — jev-07 (exposed F45) |
 | 12 | Combat target lock; clear-shot line of sight (F45) | **yes** — jev-08: target thrash and wall shots gone |
+| 13 | `TARGET_PRIORITY`: JEV chooses who to shoot (F34) | **deployed** `667F6201…` from `13f9600`; not yet run |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -143,7 +144,7 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    side). jev-04: chests between fights; variant chests flattened (F41, fixed). Walks past
    barrels (accepted). jev-05: items left on the ground (F42), equipment never used (F43) --
    both fixed in build 10. jev-06: arrive-drift-return and no mid-walk change of mind (F44, fixed; build 11).
-   jev-07: combat target thrash, shots into walls (F45, fixed; build 12). jev-08: good. Open: F34 (target priority as JEV's), F38 (save the roll), path feasibility. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
+   jev-07: combat target thrash, shots into walls (F45, fixed; build 12). jev-08: good. F34 closed (build 13). Open: F38 (save the roll), path feasibility, `strategy`/`engagement_response` still unsendable. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
    Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
    request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
    → the game. `--dry-run` asks JEV and sends nothing. Records `JEV_EXCHANGE` (request, answers,
