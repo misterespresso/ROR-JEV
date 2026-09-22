@@ -44,6 +44,32 @@ namespace Rainflayer
         /// <summary>Refresh the interactable object lists this often; state is re-read every snapshot.</summary>
         const float INTERACTABLE_CACHE_S = 2f;
 
+        /// <summary>
+        /// How a player learns a stage: anything within SEEN_RANGE_M with a clear line of sight
+        /// has been seen, and stays known for the rest of the stage. Build 6 reported every
+        /// interactable anywhere, which let the brain send the character to a chest across the
+        /// map it could never have noticed (jev-13). Cleared when the scene changes.
+        /// </summary>
+        const float SEEN_RANGE_M = 60f;
+        static readonly HashSet<int> seenIds = new HashSet<int>();
+        static string seenScene = "";
+
+        static bool HasSeen(CharacterBody body, GameObject go, float distance)
+        {
+            int id = go.GetInstanceID();
+            if (seenIds.Contains(id))
+                return true;
+            if (distance > SEEN_RANGE_M)
+                return false;
+            Vector3 from = body.aimOrigin;
+            Vector3 to = go.transform.position + Vector3.up;
+            Vector3 d = to - from;
+            if (Physics.Raycast(from, d.normalized, d.magnitude, LayerMask.GetMask("World")))
+                return false;
+            seenIds.Add(id);
+            return true;
+        }
+
         static PurchaseInteraction[] purchaseCache = new PurchaseInteraction[0];
         static BarrelInteraction[] barrelCache = new BarrelInteraction[0];
         static float interactableCacheAt = -999f;
@@ -222,8 +248,14 @@ namespace Rainflayer
             }
 
             Vector3 me = body.corePosition;
+            string scene = SceneManager.GetActiveScene().name;
+            if (scene != seenScene)
+            {
+                seenIds.Clear();          // a new stage is unknown again
+                seenScene = scene;
+            }
             var found = new List<KeyValuePair<float, string>>();
-            int unavailable = 0;
+            int unavailable = 0, unseen = 0;
 
             foreach (var pi in purchaseCache)
             {
@@ -231,6 +263,7 @@ namespace Rainflayer
                 if (!pi.available) { unavailable++; continue; }
                 Vector3 pos = pi.transform.position;
                 float d = Vector3.Distance(me, pos);
+                if (!HasSeen(body, pi.gameObject, d)) { unseen++; continue; }
                 var fields = new List<string>
                 {
                     P("id", pi.gameObject.GetInstanceID().ToString(CultureInfo.InvariantCulture)),
@@ -259,6 +292,7 @@ namespace Rainflayer
                 if (bi.Networkopened) { unavailable++; continue; }
                 Vector3 pos = bi.transform.position;
                 float d = Vector3.Distance(me, pos);
+                if (!HasSeen(body, bi.gameObject, d)) { unseen++; continue; }
                 found.Add(new KeyValuePair<float, string>(d, "{" + string.Join(",", new[]
                 {
                     P("id", bi.gameObject.GetInstanceID().ToString(CultureInfo.InvariantCulture)),

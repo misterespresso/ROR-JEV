@@ -995,13 +995,21 @@ namespace Rainflayer
         private const float PICKUP_REFLEX_RANGE = 12f;
         private const float PICKUP_REFLEX_S = 4f;
 
+        /// <summary>jev-13: a chest's item takes a moment to fly out and land. The reflex looked
+        /// before it existed, the next command started, and the item was left behind. After any
+        /// successful interaction, watch wider and longer for what it dropped.</summary>
+        private const float LOOT_WATCH_S = 8f;
+        private const float LOOT_WATCH_RANGE = 20f;
+        private float lootWatchUntil;
+
         /// <summary>True while steering onto a dropped item; the caller skips all other logic.</summary>
         private bool TryPickupReflex(CharacterBody body)
         {
             bool safe = entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE) == 0;
             if (pickupReflexTarget == null && safe && Time.frameCount % 15 == 0)
             {
-                GameObject p = entityDetector.FindNearestPickup(range: PICKUP_REFLEX_RANGE);
+                float range = Time.time < lootWatchUntil ? LOOT_WATCH_RANGE : PICKUP_REFLEX_RANGE;
+                GameObject p = entityDetector.FindNearestPickup(range: range);
                 var ctrl = p != null ? p.GetComponent<GenericPickupController>() : null;
                 PickupDef def = ctrl != null ? PickupCatalog.GetPickupDef(ctrl.pickupIndex) : null;
                 if (def != null && def.equipmentIndex == EquipmentIndex.None)
@@ -1338,6 +1346,7 @@ namespace Rainflayer
                     // so it's only true on the exact frame OnInteractionBegin fires)
                     if (navigationController.lastInteractionSucceeded)
                     {
+                        lootWatchUntil = Time.time + LOOT_WATCH_S;   // jev-13: wait for the drop
                         socketBridge?.SendEvent("action_complete",
                             ("command", navigationController.lastInteractionCommand ?? "FIND_AND_INTERACT:unknown"),
                             ("status", "success")

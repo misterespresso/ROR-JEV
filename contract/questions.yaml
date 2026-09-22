@@ -31,6 +31,7 @@ game_primer:
   - "Difficulty rises with run time, from Easy through Medium, Hard and worse: the same enemies hit harder and take more killing later. `run.difficulty_band` is how far that has gone."
   - "A stage ends only by starting the teleporter, surviving the boss, and leaving through it. Staying on one stage forever makes every later fight harder and finishes nothing."
   - "Once `objective.unopened_left_here` is nothing -- the stage is picked clean -- and health is good, starting the teleporter is usually the right move. `run.stage_time_band` says how long this stage has taken: fresh, settled, or overdue."
+  - "The character knows only what it has seen: chests, shrines and drones it has come within sight of. Exploring reveals more, so `objective.unopened_left_here` being nothing can mean the stage is picked clean, or that little of it has been walked yet -- `run.stage_time_band` tells them apart."
   - "`objective.unopened_left_here` counts what is still unopened here; `objective.affordable_left_here` counts what the character can pay for right now. Chests it cannot afford yet are a reason to fight for gold, not a reason to leave."
 
 questions:
