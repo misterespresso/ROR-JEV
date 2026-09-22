@@ -25,7 +25,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 2 | `QUERY_OBSERVATION`: time, difficulty, survivor, HP, 4 hazard facts | **yes** — fork-06, 516 frames, every check below passes |
 
 | 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | loads (cfg key written); superseded by build 4 before a run was recorded |
-| 4 | `OBSERVATION` gains a `threat` block: enemy/elite/boss/targeting counts within 50 m, 16 nearest with body, team, elite, boss, flying, distance, targeting | **deployed** `48A5B4A4…` from `b0e03a2`; **not yet run** |
+| 4 | `OBSERVATION` gains a `threat` block: enemy/elite/boss/targeting counts within 50 m, 16 nearest with body, team, elite, boss, flying, distance, targeting | **yes** — fork-07: 18 frames, every body classified; `engage_range` sendable 13/18 |
+| 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m) | built — see below |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -92,7 +93,7 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
    doc defines them. Effect on fork-06: `worth_start_teleporter` sendable on the 6 ticks the
    teleporter is offered, the first worth gate ever sendable. `strategy` and `engage_range` are
    still blocked, now only on `threat` sub-fields (elite, enemy classes, focus, feasibility).
-5. **Threat telemetry: built, deployed as build 4, not yet run.** The mod sends raw facts
+5. **Threat telemetry: done, verified in fork-07.** The mod sends raw facts
    (`mod/Observation.cs` `Threat`); `brain/enemy_class.py` bands them: `elite_present` from the
    elite count, `enemy_classes` from a provisional body-name table (`is_boss` wins; `unknown` if
    unrecognised bodies outnumber recognised ones), `being_focused` at ≥ 3 AIs targeting the
@@ -106,6 +107,7 @@ i.e. a pre-build-3 mod that blocks unconditionally — not "off".
    `"block_repeat_damage": false`; `threat.enemy_count` roughly matches stock `enemy_count`
    (stock also counts dead bodies, so it can be higher); `targeting_player_count` rises in a
    fight; every body name in the run is in `BODIES` (unlisted ones show as unclassified).
+   fork-07 also rolled off a cliff 3 times in combat and died at 36 s (F33, fixed in build 5).
    Raw `threat.enemies` in the adapter stays empty: no entity IDs, so `fight_boss` still cannot
    target them (F17).
 6. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.

@@ -159,6 +159,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F30 | `next_action` needs the *whole* `threat` block, including path feasibility | **decided 2026-09-21: narrowed** to `enemies_near`, `nearest_enemy_band`, `boss_active`; unknowns stripped from the wire state |
 | F31 | **`run_suite` reported a crashing test file as PASS** (0 passed, 0 failed) | **fixed** — a crash or a non-zero exit is now a failure |
 | F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | **fixed** — `build_request` asks nothing when `self.hp_band` is `dead` |
+| F33 | **Combat movement walks and rolls off cliffs**: backing away and the utility dash have no edge check | **fixed in fork build 5** — not yet verified in game |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1120,6 +1121,29 @@ tick loop at death.
 with reason `dead`. A global rule rather than an `enabled_when` on each question, because no
 question is meaningful for a dead character and a per-question gate can be forgotten on the next
 one added. fork-06: 3 ticks, all now empty.
+
+
+### F33 — Combat movement and the utility dash go off cliffs
+
+fork-07 (build 4, Commando, Drizzle): the person watching saw the character, in combat, roll
+backwards off a cliff three times. The observations agree exactly: environmental damage at 26 s
+(−46 HP), 30 s (−51 HP) and 33 s (−19 HP, leaving 1 HP), each the fall-and-teleport penalty, and
+death at 36 s. The falls ended the run.
+
+Two paths, neither with an edge check (build 1 fixed roaming only):
+
+- `ApplyMovementControl` backs straight away from an enemy inside the strategy's optimal range.
+- `UseSkillIfReady` fires the utility whenever the target is within its range (20 m balanced).
+  Commando's utility is a dive in the direction of travel -- backwards, while backing away.
+
+**Fixed in build 5.** Combat movement probes for ground every 2 m out to 3 m ahead (build 1's ray)
+and, if the heading is unsafe, takes the first safe detour at ±45°, ±90°, ±135°, 180°, or stands
+still. The utility skill is skipped unless ground runs the whole way to 12 m in the direction it
+will go (move vector, or aim if standing). Both log `[EDGE]` lines (≤ 1/s) to the BepInEx log.
+
+The same run is the first real evidence for builds 2 and 4: every fall registered as
+environmental damage, and the threat block classified every body it saw (Beetle, Lemurian,
+Golem). `engage_range` was sendable on 13 of 18 ticks.
 
 ---
 

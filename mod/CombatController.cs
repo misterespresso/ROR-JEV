@@ -454,6 +454,85 @@ namespace Rainflayer
                         Log($"[ZONE-LEASH] combat override: XZ-dist={distToCenter:F1}m > {zoneLeashRadius * 0.8f:F1}m — steering back to center");
                 }
             }
+
+            // ROR-JEV (fork-07): combat movement had no edge check -- backing away from a close
+            // enemy walked the character off cliffs. Last, so it also covers the leash override.
+            body.inputBank.moveVector = EdgeSafe(body, body.inputBank.moveVector);
+        }
+
+        // -----------------------------------------------------------------------
+        // ROR-JEV: edge safety for combat movement and the utility skill (fork-07)
+        // -----------------------------------------------------------------------
+
+        /// <summary>How far ahead combat movement must have ground: build 1's roam check distance.</summary>
+        private const float EDGE_WALK_PROBE_M = 3f;
+
+        /// <summary>How far ahead the utility skill must have ground. Commando's Tactical Dive and
+        /// most survivors' dashes travel well past a walking step; a conservative bound.</summary>
+        private const float EDGE_UTILITY_PROBE_M = 12f;
+
+        private const float EDGE_PROBE_STEP_M = 2f;
+
+        /// <summary>Fallback headings, tried in order when the chosen one leads off an edge.</summary>
+        private static readonly float[] EdgeDetourDegrees = { 45f, -45f, 90f, -90f, 135f, -135f, 180f };
+
+        private float edgeLogTimer;
+
+        /// <summary>
+        /// True if there is ground under every probe point along <paramref name="dir"/> out to
+        /// <paramref name="distance"/>. Same ray as build 1's roam check: from 2 m above the
+        /// point, 5 m down, World layer.
+        /// </summary>
+        private static bool GroundAlong(Vector3 from, Vector3 dir, float distance)
+        {
+            dir.y = 0;
+            if (dir.sqrMagnitude < 1e-4f)
+                return true;
+            dir.Normalize();
+            int world = LayerMask.GetMask("World");
+            for (float d = EDGE_PROBE_STEP_M; d <= distance + 0.01f; d += EDGE_PROBE_STEP_M)
+            {
+                Vector3 p = from + dir * d + Vector3.up * 2f;
+                if (!Physics.Raycast(p, Vector3.down, 5f, world))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The requested move if it keeps ground underfoot; otherwise the nearest detour heading
+        /// that does, at the same speed; otherwise standing still. Standing still must be an
+        /// explicit zero: RainflayerPlugin restores last frame's moveVector (see build 1).
+        /// </summary>
+        private Vector3 EdgeSafe(CharacterBody body, Vector3 move)
+        {
+            if (move.sqrMagnitude < 1e-4f)
+                return move;
+            Vector3 pos = body.transform.position;
+            if (GroundAlong(pos, move, EDGE_WALK_PROBE_M))
+                return move;
+
+            float speed = move.magnitude;
+            Vector3 flat = new Vector3(move.x, 0f, move.z);
+            foreach (float deg in EdgeDetourDegrees)
+            {
+                Vector3 alt = Quaternion.AngleAxis(deg, Vector3.up) * flat;
+                if (GroundAlong(pos, alt, EDGE_WALK_PROBE_M))
+                {
+                    EdgeLog($"[EDGE] combat move blocked by an edge; detour {deg:+0;-0}°");
+                    return alt.normalized * speed;
+                }
+            }
+            EdgeLog("[EDGE] combat move blocked by an edge in every direction; holding still");
+            return Vector3.zero;
+        }
+
+        private void EdgeLog(string msg)
+        {
+            if (Time.time - edgeLogTimer < 1f)
+                return;
+            edgeLogTimer = Time.time;
+            Log(msg);
         }
 
         /// <summary>
@@ -583,6 +662,21 @@ namespace Rainflayer
                                      float distanceToTarget, float maxRange)
         {
             if (skill == null || !skill.IsReady() || distanceToTarget > maxRange) return;
+
+            // ROR-JEV (fork-07): the utility is a dash for most survivors, and it goes where the
+            // character is moving (or looking, if standing still). Commando's dive took the
+            // character off a cliff backwards three times in one fight. Skip it this frame
+            // unless the whole dash lands on ground.
+            if (slotIndex == 3 && body.inputBank != null)
+            {
+                Vector3 dashDir = body.inputBank.moveVector.sqrMagnitude > 1e-4f
+                    ? body.inputBank.moveVector : body.inputBank.aimDirection;
+                if (!GroundAlong(body.transform.position, dashDir, EDGE_UTILITY_PROBE_M))
+                {
+                    EdgeLog("[EDGE] utility skipped: its path leaves the ground");
+                    return;
+                }
+            }
 
             skill.ExecuteIfReady();
 
