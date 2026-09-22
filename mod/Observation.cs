@@ -317,6 +317,29 @@ namespace Rainflayer
             return null;
         }
 
+        /// <summary>
+        /// Unopened barrels within <paramref name="range"/> (build 14): free, so opening one in
+        /// passing is a reflex, not a decision. Same cache as the snapshot.
+        /// </summary>
+        public static GameObject? NearestFreeBarrel(CharacterBody body, float range)
+        {
+            if (Time.realtimeSinceStartup - interactableCacheAt > INTERACTABLE_CACHE_S)
+            {
+                purchaseCache = UnityEngine.Object.FindObjectsOfType<PurchaseInteraction>();
+                barrelCache = UnityEngine.Object.FindObjectsOfType<BarrelInteraction>();
+                interactableCacheAt = Time.realtimeSinceStartup;
+            }
+            GameObject? best = null;
+            float bestD = range;
+            foreach (var bi in barrelCache)
+            {
+                if (bi == null || bi.Networkopened) continue;
+                float d = Vector3.Distance(body.corePosition, bi.transform.position);
+                if (d < bestD) { bestD = d; best = bi.gameObject; }
+            }
+            return best;
+        }
+
         /// <summary>The prefab name: the GameObject name without Unity's "(Clone)" suffix.</summary>
         static string Prefab(GameObject go)
         {

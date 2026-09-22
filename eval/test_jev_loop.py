@@ -264,6 +264,26 @@ def trace_redirect():
     check("a flicker (not two ticks running) does not redirect", gotos == [("GOTO_ID", str(CHEST))], str(gotos))
 
 
+def trace_stuck_walk():
+    print("\njev-09: a walk that gets no closer is abandoned, and that target is set aside")
+    far = frames(True)
+    far["QUERY_OBSERVATION"]["interactables"]["items"][-1]["distance"] = 40.0   # never changes
+    old = (jev_run.STUCK_AFTER_S, jev_run.QUARANTINE_S)
+    jev_run.STUCK_AFTER_S, jev_run.QUARANTINE_S = -1.0, 300.0
+    try:
+        asked: list = []
+        p, rec = run([far] * 4, pick=str(CHEST), asked=asked)
+    finally:
+        jev_run.STUCK_AFTER_S, jev_run.QUARANTINE_S = old
+    rel = [f for f in rec.frames if f.get("note") == "task_released"]
+    check("the stuck walk is released", rel and "no closer" in rel[0]["why"], str(rel))
+    later = [w for w in asked[2:]]
+    check("the target is not offered again while set aside",
+          all(not any(str(CHEST) in k for k in w["questions"]["next_action"]["criteria"])
+              for w in later), str([sorted(w["questions"]["next_action"]["criteria"]) for w in later][:1]))
+    check("only one walk was ever sent", len([c for c in p.commands if c[0] == "GOTO_ID"]) == 1, str(p.commands))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -275,7 +295,8 @@ def trace_dead_asks_nothing():
 if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
-              trace_equipment, trace_redirect, trace_dead_asks_nothing):
+              trace_equipment, trace_redirect, trace_stuck_walk,
+              trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

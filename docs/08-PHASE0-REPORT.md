@@ -172,6 +172,8 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F43 | **Equipment was picked up and never used**: nothing reported readiness or fired it | **fixed in build 10** — readiness in OBSERVATION, `USE_EQUIPMENT`, equipment table; capability pulled into milestone 1 |
 | F44 | **Arrive, drift, walk back**; and JEV could not change its mind mid-walk | **fixed** — build 11 holds at the destination; loop decides on task end and redirects walks |
 | F45 | **Combat target thrash and shots into walls**: target re-picked every frame; lenient multi-height LOS | **fixed in build 12** — target lock; clear-shot ray from the aim origin |
+| F46 | **A walk that never arrived froze the agent**: 3D arrival radius, and giving up was silent | **fixed in build 14** — horizontal arrival, give-up reported, stuck walks abandoned and set aside |
+| F47 | Barrels were run past for five runs | **fixed in build 14** — free, so opened in passing as a reflex |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1357,6 +1359,27 @@ Asked for real, on a jev-08 tick with two enemies and a boss, varying only the i
 
 The first row is jev-03's death: kill-healing items, the mod burning the boss while the small
 enemies wore the character down.
+
+
+### F46 — One unreachable shrine froze the whole agent
+
+jev-09: "ignores shrines... started looping, just kept jumping on the shrine". JEV asked for that
+Shrine of Chance 16 times in 28 ticks. One `GOTO_ID` went out, `action_started` came back, and no
+terminal event ever did -- so the task slot stayed held and every later pick was discarded. Two
+causes: arrival required 3D distance < 2.5 m, and a tall shrine's origin sits below where you
+stand, so the character hovered just outside it and jumped; and when the mod's own frustration
+counter gave up, it cleared navigation **silently**, telling the brain nothing.
+
+Build 14: arrival is horizontal (3.5 m) with a 4 m vertical tolerance, separate from the 2.5 m
+pressing range (`HandleInteractionHolding` walks the last metre itself); giving up sends
+`action_failed: unreachable` against the command's label. Brain side, independent of the mod: a
+walk whose target gets no closer than 1 m in 12 s is abandoned, and that target is hidden from
+JEV's options for 60 s so the next tick is not handed the same unreachable thing.
+
+### F47 — Barrels
+
+Free, so opening one within 4 m with no enemy near is a reflex (build 14), like the dropped-item
+pickup. Walking to a distant barrel stays JEV's choice.
 
 ---
 

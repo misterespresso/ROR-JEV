@@ -55,6 +55,14 @@ TASK_TIMEOUT_DEFAULT_S = 30.0
 REDIRECT_TICKS = 2
 REDIRECT_MIN_P = 0.50
 
+#: jev-09: a walk to a tall shrine never arrived and the mod reported nothing, so the task held
+#: for the whole run and 16 JEV picks were discarded. A walk whose target gets no closer than
+#: STUCK_PROGRESS_M in STUCK_AFTER_S is abandoned, and that target is set aside for QUARANTINE_S
+#: so the next tick is not handed the same unreachable thing.
+STUCK_AFTER_S = 12.0
+STUCK_PROGRESS_M = 1.0
+QUARANTINE_S = 60.0
+
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
 
@@ -70,6 +78,8 @@ class Task:
         self.command_id, self.label, self.target_iid, self.since = (
             command_id, label, target_iid, now)
         self.objective, self.timeout_s = objective, timeout_s
+        self.best_m: float | None = None     # closest the target has been
+        self.best_at = now
 
 
 def available_ids(observation: dict | None) -> set[str] | None:
@@ -147,6 +157,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     last_line = 0.0
     last_choice = "-"
     redirect = {"to": None, "n": 0}
+    quarantined: dict[str, float] = {}
 
     while not stop["flag"] and not p.lost and time.monotonic() < t_end:
         now = time.monotonic()
@@ -169,6 +180,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             state = EVENT_STATE.get(str(ev.get("event_type")))
             if task and state and str(ev.get("command")) == task.label:
                 life.on_event(task.command_id, state, str(ev.get("reason") or "") or None)
+                if state is State.FAILED and str(ev.get("reason")) == "unreachable" and task.target_iid:
+                    quarantined[str(task.target_iid)] = now + QUARANTINE_S
                 if state in (State.COMPLETED, State.FAILED):
                     rec.record({"type": "HARNESS_NOTE", "note": "task_ended",
                                 "label": task.label, "how": ev.get("event_type"),
@@ -178,12 +191,24 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         if task:
             ids = available_ids(obs)
             why = None
+            # Is the walk actually getting closer? (jev-09)
+            d = None
+            for it in ((obs or {}).get("interactables") or {}).get("items") or []:
+                if str(it.get("id")) == task.target_iid:
+                    d = it.get("distance")
+            if d is not None and (task.best_m is None or d < task.best_m - STUCK_PROGRESS_M):
+                task.best_m, task.best_at = d, now
             if task.target_iid and ids is not None and task.target_iid not in ids:
                 why, state = "target no longer available (used)", State.COMPLETED
             elif st.objective != task.objective:
                 # F37: starting the teleporter sends no terminal event, so jev-01 held the slot
                 # 13 s into the charge before defend_zone could be chosen.
                 why, state = f"objective changed {task.objective} -> {st.objective}", State.COMPLETED
+            elif (task.best_m is not None and now - task.best_at > STUCK_AFTER_S
+                  and task.label.startswith("GOTO_ID:")):
+                quarantined[str(task.target_iid)] = now + QUARANTINE_S
+                why, state = (f"no closer than {task.best_m:.0f} m in {STUCK_AFTER_S:g}s "
+                              f"-- set aside for {QUARANTINE_S:g}s"), State.FAILED
             elif now - task.since > task.timeout_s:
                 why, state = f"no outcome within {task.timeout_s:g}s", State.FAILED
             if why:
@@ -198,6 +223,15 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                                    "QUERY_COMBAT_STATUS", "QUERY_INTERACTABLES")):
             continue
         n += 1
+        # Targets that could not be reached are hidden until their quarantine expires, so JEV is
+        # not offered them again straight away (jev-09).
+        quarantined = {k: v for k, v in quarantined.items() if v > now}
+        if quarantined and isinstance((obs or {}).get("interactables"), dict):
+            obs = dict(obs)
+            block = dict(obs["interactables"])
+            block["items"] = [it for it in block.get("items") or []
+                              if str(it.get("id")) not in quarantined]
+            obs["interactables"] = block
         ad = adapt(got["QUERY_OBJECTIVE"], got["QUERY_INVENTORY"], got["QUERY_COMBAT_STATUS"],
                    got["QUERY_INTERACTABLES"], observation_id=f"{a.run_id}-{n}", seq=n,
                    observation=obs)
@@ -271,7 +305,10 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             if life.task and life.task.command_id == cmd.command_id:
                 if mc.holds_slot and not a.dry_run:
                     life.on_event(cmd.command_id, State.ACCEPTED)
-                    iid = mc.args if mc.command == "INTERACT_ID" else None
+                    # The object this task is about, when it names one: used to notice it
+                    # was used (gone from the list) and whether a walk is making progress.
+                    iid = (mc.args if mc.command in ("INTERACT_ID", "GOTO_ID")
+                           and mc.args != "teleporter" else None)
                     task = Task(cmd.command_id, mc.label, iid, now, st.objective,
                                 TASK_TIMEOUT_S.get(mc.command, TASK_TIMEOUT_DEFAULT_S))
                 else:

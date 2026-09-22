@@ -963,6 +963,8 @@ namespace Rainflayer
             return best;
         }
 
+        private const float BARREL_REFLEX_RANGE = 4f;
+
         private float arrivalHoldUntil;
         private const float ARRIVAL_HOLD_S = 3f;
 
@@ -1050,6 +1052,8 @@ namespace Rainflayer
             navigationController.gotoTarget = obj;
             navigationController.gotoInteractable = target;
             navigationController.isNavigating = true;
+            navigationController.lastInteractionCommand = label;   // for a give-up report
+            navigationController.NavGaveUp = false;
 
             socketBridge?.SendEvent("action_started", ("command", label),
                 ("target", obj.name), ("distance", ((int)dist).ToString()), ("cost", cost.ToString()));
@@ -1183,6 +1187,23 @@ namespace Rainflayer
                 // taking it swaps the equipment carried, which is a decision.
                 if (entityDetector != null && TryPickupReflex(body))
                     return;
+
+                // === ROR-JEV (build 14): FREE BARREL IN PASSING ===
+                // jev-05..jev-09: the character kept running past barrels. They cost nothing, so
+                // taking one within reach is a reflex; walking to a distant one stays JEV's call.
+                if (entityDetector != null && Time.frameCount % 15 == 0
+                    && entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE) == 0)
+                {
+                    GameObject barrel = Observation.NearestFreeBarrel(body, BARREL_REFLEX_RANGE);
+                    var barrelInteractor = barrel != null ? body.GetComponent<Interactor>() : null;
+                    var barrelInteractable = barrel != null ? barrel.GetComponent<IInteractable>() : null;
+                    if (barrelInteractor != null && barrelInteractable != null
+                        && barrelInteractable.GetInteractability(barrelInteractor) == Interactability.Available)
+                    {
+                        barrelInteractor.AttemptInteraction(barrel);
+                        Log($"[BARREL] opened '{barrel.name}' in passing");
+                    }
+                }
 
                 // === ROR-JEV (build 11): HOLD AT A GOTO_ID DESTINATION ===
                 // Stand still until the next command or ARRIVAL_HOLD_S, unless an enemy is close
@@ -1351,6 +1372,15 @@ namespace Rainflayer
                 if (navigationController.isNavigating)
                 {
                     bool arrived = navigationController.HandleGotoNavigation(body);
+                    if (navigationController.NavGaveUp)
+                    {
+                        // ROR-JEV (build 14, jev-09): an unreachable target used to end in
+                        // silence, and the brain held the task until the run was over.
+                        navigationController.NavGaveUp = false;
+                        socketBridge?.SendEvent("action_failed",
+                            ("command", navigationController.lastInteractionCommand ?? "GOTO_ID:unknown"),
+                            ("reason", "unreachable"));
+                    }
                     if (arrived)
                     {
                         if (navigationController.gotoInteractable?.Type == "goto_entity")

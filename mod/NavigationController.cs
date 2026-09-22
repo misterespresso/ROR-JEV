@@ -420,7 +420,12 @@ namespace Rainflayer
         private GameObject interactionTarget = null;
         private float interactionHoldTimer = 0f;
         private const float INTERACT_HOLD_DURATION = 1.5f;  // Hold interact for 1.5 seconds
-        private const float INTERACT_DISTANCE_THRESHOLD = 2.5f;  // RoR2 interaction range is ~2-3m
+        private const float INTERACT_DISTANCE_THRESHOLD = 2.5f;  // pressing range; RoR2 is ~3m
+        private const float ARRIVAL_DISTANCE_THRESHOLD = 3.5f;   // horizontal arrival (build 14)
+        private const float ARRIVAL_HEIGHT_TOLERANCE = 4f;       // a tall shrine's origin sits low
+
+        /// <summary>ROR-JEV (build 14): set when navigation gave up, so the brain can be told.</summary>
+        public bool NavGaveUp;
 
         // Settle timer: how long the character must be within range before interaction fires.
         // Prevents overshoot with fast movement items (Goat Hoof, Energy Drink, etc.)
@@ -1081,9 +1086,17 @@ namespace Rainflayer
             bool isLastChainWaypoint = isChainPhase && waypointChainIndex == _chain.Length - 1;
             float arrivalThreshold = isChainPhase ? (isLastChainWaypoint ? WAYPOINT_CHAIN_FINAL_ARRIVAL : WAYPOINT_CHAIN_ARRIVAL)
                                    : isNavWaypointPhase ? NAV_WAYPOINT_ARRIVAL_THRESHOLD
-                                   : INTERACT_DISTANCE_THRESHOLD;
-            float distance = Vector3.Distance(body.transform.position, targetPosition);
-            if (distance < arrivalThreshold)
+                                   : ARRIVAL_DISTANCE_THRESHOLD;
+            // ROR-JEV (build 14, jev-09): 3D distance never fell under 2.5 m for a tall shrine
+            // whose origin sits below where you stand, so the character jumped at it until the
+            // run ended. Arrival is horizontal, with a vertical tolerance.
+            Vector3 _toTarget = targetPosition - body.transform.position;
+            float _dy = Mathf.Abs(_toTarget.y);
+            _toTarget.y = 0f;
+            float distance = isChainPhase || isNavWaypointPhase
+                ? Vector3.Distance(body.transform.position, targetPosition)
+                : _toTarget.magnitude;
+            if (distance < arrivalThreshold && (isChainPhase || isNavWaypointPhase || _dy <= ARRIVAL_HEIGHT_TOLERANCE))
             {
                 if (isChainPhase)
                 {
@@ -1141,6 +1154,7 @@ namespace Rainflayer
                 if (frustration >= FRUSTRATION_THRESHOLD)
                 {
                     Log($"[GOTO] Giving up on unreachable target after {stuckTimer:F1}s (frustration: {frustration:F1})");
+                    NavGaveUp = true;          // jev-09: the brain waited forever for an event
                     ClearFullNavigationState("frustrated, giving up");
                     return false;
                 }
