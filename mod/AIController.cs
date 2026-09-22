@@ -296,6 +296,25 @@ namespace Rainflayer
                         HandleInteractId(args, interact: false);
                         break;
 
+                    // ROR-JEV (build 13, F34): who to shoot, chosen by JEV each tick.
+                    case "TARGET_PRIORITY":
+                    {
+                        string mode = (args ?? "").Trim().ToLower();
+                        if (mode != "focus_boss" && mode != "clear_adds" && mode != "nearest")
+                        {
+                            socketBridge?.SendEvent("action_failed", ("command", "TARGET_PRIORITY"),
+                                ("reason", "bad_args"));
+                            break;
+                        }
+                        if (mode != EntityDetector.TargetPriority)
+                        {
+                            EntityDetector.TargetPriority = mode;
+                            lockedTarget = null;     // apply next frame, not after this kill
+                            Log($"[TARGETING] priority -> {mode}");
+                        }
+                        break;
+                    }
+
                     // ROR-JEV (build 10): fire the equipment now, if it has a charge.
                     case "USE_EQUIPMENT":
                     {

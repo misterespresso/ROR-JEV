@@ -141,7 +141,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     t_end = time.monotonic() + a.minutes * 60
     t_next = 0.0
     backoff_until = 0.0
-    last_posture = None
+    last_setting: dict[str, str] = {}
     n = asked = errors = 0
     tokens = 0
     last_line = 0.0
@@ -258,10 +258,11 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                 if life.task and life.task.command_id == cmd.command_id:
                     life.on_event(cmd.command_id, State.REJECTED, "unsupported")
                 continue
-            if mc.command == "STRATEGY":
-                if mc.args == last_posture:
+            # Settings the mod keeps until told otherwise: send only on a change.
+            if mc.command in ("STRATEGY", "TARGET_PRIORITY"):
+                if last_setting.get(mc.command) == mc.args:
                     continue
-                last_posture = mc.args
+                last_setting[mc.command] = mc.args
             rec.record({"type": "HARNESS_DECISION", "origin": cmd.origin,
                         "action_id": cmd.action_id, "command": mc.command, "args": mc.args,
                         "dry_run": a.dry_run})

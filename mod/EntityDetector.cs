@@ -693,6 +693,9 @@ namespace Rainflayer
             return false;
         }
 
+        /// <summary>ROR-JEV (build 13, F34): focus_boss (default), clear_adds, or nearest.</summary>
+        public static string TargetPriority = "focus_boss";
+
         /// <summary>ROR-JEV (build 12): nothing but air between the aim origin and the point.</summary>
         public bool HasClearShot(CharacterBody body, Vector3 point)
         {
@@ -774,6 +777,23 @@ namespace Rainflayer
                 // Closer = higher priority (normalized to 0-1, inverted)
                 score += (1f - (distance / maxRange)) * 30f;
 
+                // ROR-JEV (build 13, F34): which enemy to fight is JEV's call, per tick.
+                //   focus_boss  - the stock scoring below (boss +50, elite +30)
+                //   clear_adds  - small enemies first: bosses and elites sink, low health rises
+                //   nearest     - distance only; nothing else counts
+                if (TargetPriority == "clear_adds")
+                {
+                    if (enemyBody.isBoss) score -= 60f;
+                    else if (enemyBody.isElite) score -= 20f;
+                    if (enemyBody.healthComponent != null)
+                        score += (1f - enemyBody.healthComponent.combinedHealthFraction) * 20f;
+                }
+                else if (TargetPriority == "nearest")
+                {
+                    // distance term only (added above)
+                }
+                else
+                {
                 // Boss = high priority
                 if (enemyBody.isBoss)
                     score += 50f;
@@ -788,6 +808,7 @@ namespace Rainflayer
                     float healthPercent = enemyBody.healthComponent.combinedHealthFraction;
                     score += (1f - healthPercent) * 20f; // More points for lower health
                 }
+                }   // end focus_boss
 
                 // Already in crosshair = highest priority (stick to current target)
                 Vector3 dirToEnemy = (enemyPosition - body.corePosition).normalized;

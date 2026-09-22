@@ -143,6 +143,41 @@ ITEMS: dict[str, tuple[str, str]] = {
 }
 
 
+#: What an item does, when that changes how to fight (F34). Only items whose effect bears on
+#: target choice or positioning are listed; the rest are strength, not tactics. PROVISIONAL.
+EFFECTS: dict[str, str] = {
+    "Tooth": "Monster Tooth: every kill drops a healing orb",
+    "Mushroom": "Bustling Fungus: standing still heals the character",
+    "HealWhileSafe": "Cautious Slug: health regenerates faster out of combat",
+    "Seed": "Leeching Seed: hits heal a little",
+    "Infusion": "Infusion: kills raise maximum health permanently",
+    "Crowbar": "Crowbar: much more damage to enemies above 90% health",
+    "BossDamageBonus": "Armor-Piercing Rounds: much more damage to bosses",
+    "ExecuteLowHealthElite": "Old Guillotine: instantly kills weakened elites",
+    "NearbyDamageBonus": "Focus Crystal: more damage to enemies that are very close",
+    "BarrierOnKill": "Topaz Brooch: every kill grants a temporary shield",
+    "BonusGoldPackOnKill": "Ghor's Tome: some kills drop gold",
+    "IgniteOnKill": "Gasoline: kills set nearby enemies on fire",
+    "GhostOnKill": "Happiest Mask: kills raise ghosts that fight alongside",
+    "ExplodeOnDeath": "Will-o'-the-wisp: kills cause an explosion",
+    "HeadHunter": "Wake of Vultures: killing an elite grants its power for a while",
+    "Bear": "Tougher Times: a chance to block any hit",
+    "ArmorPlate": "Repulsion Armor Plate: every hit taken is reduced by a flat amount",
+    "SprintArmor": "Rose Buckler: armor while sprinting",
+    "Phasing": "Old War Stealthkit: going low on health grants a brief escape",
+    "ExtraLife": "Dio's Best Friend: survives one death",
+    "Thorns": "Razorwire: being hit damages nearby enemies",
+    "Behemoth": "Brilliant Behemoth: every hit explodes",
+    "Clover": "57 Leaf Clover: luck improves every chance effect",
+}
+
+
+def effects(items: list[dict]) -> list[str]:
+    """The lines for the items actually carried, in table order, at most six."""
+    held = {str(i.get("name")) for i in items or []}
+    return [text for name, text in EFFECTS.items() if name in held][:6]
+
+
 def describe_item(name: str | None, hidden: bool = False) -> str:
     """How a shop item reads to JEV: tier and role from the table, then the internal name.
     Hidden (the "?" terminal) or unrecognised items say so rather than guess."""

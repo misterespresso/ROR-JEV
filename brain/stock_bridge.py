@@ -71,6 +71,9 @@ def to_mod(cmd: Command) -> ModCommand | None:
     if c == "SET_POSTURE":
         s = a.get("strategy")
         return ModCommand("STRATEGY", s, False, f"STRATEGY:{s}") if s else None
+    if c == "SET_TARGET_PRIORITY":
+        pr = a.get("priority")
+        return ModCommand("TARGET_PRIORITY", pr, False, f"TARGET_PRIORITY:{pr}") if pr else None
     if c == "USE_EQUIPMENT":
         return ModCommand("USE_EQUIPMENT", "", False, "USE_EQUIPMENT")
     if c == "CANCEL":

@@ -89,6 +89,23 @@ questions:
     references_answers: []
     hysteresis: { entry: 0.50, exit: 0.30, dwell_ms: 600 }
 
+  target_priority:
+    type: choice
+    options: [focus_boss, clear_adds, nearest]
+    enabled_when: capability(set_posture)
+    # F34: who to shoot was the mod's fixed scoring (boss +50), so a character holding
+    # kill-healing items burned the boss while small enemies wore it down (jev-03).
+    required_state_fields:
+      - threat.enemies_near
+      - threat.boss_active
+      - threat.enemy_classes
+      - self.hp_band
+      - build.effects
+    required_capabilities: [set_posture]
+    policy_consumers:
+      - dispatch.posture_channel
+    references_answers: []
+
   continue_is_worthwhile:
     type: noul
     enabled_when: active_task_exists
@@ -297,6 +314,21 @@ payload:
         what: "Comfortable weapon range, kiting between shots."
       far:
         what: "Maximum effective range, avoiding melee contact."
+
+  target_priority:
+    instructions: >-
+      Which enemies should the character shoot first? `build.effects` lists what the items
+      carried do, `threat` describes what is nearby, and `self.hp_band` is current health.
+    criteria:
+      focus_boss:
+        what: "Shoot the biggest enemy -- a boss or an elite -- first, and finish it."
+        not_for: "When the small enemies are doing most of the damage, or kills are needed for healing."
+      clear_adds:
+        what: "Kill the small enemies first, leaving bosses and elites for last."
+        not_for: "When a boss is nearly dead, or the small enemies are harmless."
+      nearest:
+        what: "Shoot whatever is closest, whatever it is."
+        not_for: "When one enemy is clearly the real threat."
 
   continue_is_worthwhile:
     instructions: >-

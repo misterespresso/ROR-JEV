@@ -32,7 +32,7 @@ from .catalog import UNKNOWN
 from .enemy_class import band_threat
 from .equipment import band as band_equipment
 from .interactable_type import REGISTRY_TYPE, classify as classify_prefab, shop_item_name
-from .build_identity import describe_item
+from .build_identity import describe_item, effects as item_effects
 
 #: Every place this adapter is making something up rather than reading it. Kept as data so
 #: a replay report can print it, because a reader who does not know these is being misled.
@@ -434,6 +434,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                           else "charging" if stock_phase == "charging_teleporter"
                           else "not_started")},
         "build": {"identity": derive_identity(items) if inventory else UNKNOWN,
+                  "effects": item_effects(items) if inventory else UNKNOWN,
                   "key_items": [str(i.get("name")) for i in items]},
         "control": {"active_action": None, "progress_band": UNKNOWN,
                     "consecutive_failures": 0, "last_latency_band": UNKNOWN},

@@ -160,7 +160,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F31 | **`run_suite` reported a crashing test file as PASS** (0 passed, 0 failed) | **fixed** — a crash or a non-zero exit is now a failure |
 | F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | **fixed** — `build_request` asks nothing when `self.hp_band` is `dead` |
 | F33 | **Combat movement walks and rolls off cliffs**: backing away and the utility dash have no edge check | **fixed in fork build 5** — not yet verified in game |
-| F34 | **Combat target choice is fixed in the mod, not JEV's**: boss +50 wins, then sticks | open — needs a target-priority channel and readable item effects |
+| F34 | **Combat target choice is fixed in the mod, not JEV's**: boss +50 wins, then sticks | **fixed in build 13** — `target_priority` question; `build.effects` in state |
 | F35 | **`navigate` executed an interaction**: walking to the teleporter started it, past JEV's "not worth it" | **fixed in build 9** — `GOTO_ID` walks only |
 | F36 | **`navigate` options were indistinguishable** except by key; `gold_band` could not say "can afford" | **fixed** — options name target, cost and distance bands; gold banded against prices |
 | F37 | JEV loop held a task past a phase change; 30 s cut long walks | **fixed** — release on objective change; walks get 60 s |
@@ -1336,6 +1336,27 @@ heights up to 2 m above the eye, cleared -- over a waist-high wall, which the bu
 Fixed in build 12: a target lock (kept until the target dies, leaves 50 m, or has had no clear
 shot for 0.5 s), and combat line of sight is one ray from `body.aimOrigin` to the enemy's
 centre. Which enemy to lock onto stays F34's question.
+
+
+### F34 closed — who to shoot is JEV's decision, per tick
+
+Build 13 gives `EntityDetector.FindBestTarget` three scorings, chosen by the `TARGET_PRIORITY`
+command: `focus_boss` (the stock scoring), `clear_adds` (bosses -60, elites -20, weakened enemies
+up), `nearest` (distance only). Setting it releases the build-12 lock so the change applies to the
+next frame rather than after the current kill. The `target_priority` question (posture channel,
+asked every tick) chooses; `build.effects` puts what the carried items DO into state -- one line
+per item whose effect bears on tactics, from a provisional table.
+
+Asked for real, on a jev-08 tick with two enemies and a boss, varying only the items:
+
+| items carried | JEV |
+|---|---|
+| Monster Tooth + Topaz Brooch (kills heal, kills shield) | **clear_adds 0.68** |
+| Armor-Piercing Rounds + Crowbar (boss damage) | **focus_boss 0.76** |
+| Monster Tooth, no boss | clear_adds 0.53, nearest 0.46 |
+
+The first row is jev-03's death: kill-healing items, the mod burning the boss while the small
+enemies wore the character down.
 
 ---
 

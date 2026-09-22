@@ -136,6 +136,12 @@ def dispatch(obs: dict, answers: dict, registry: dict, lifecycle, capabilities: 
                 {"strategy": strat and strat["choice"], "engage_range": rng and rng["choice"]},
                 origin=f"jev:strategy:{obs_id}"))
 
+    # ---- Target priority: which enemies to shoot first (F34) ---------------
+    tp = answers.get("target_priority")
+    if tp is not None and "set_posture" in capabilities:
+        out.commands.append(new_cmd("SET_TARGET_PRIORITY", {"priority": tp["choice"]},
+                                    origin=f"jev:target_priority:{obs_id}"))
+
     # ---- Equipment: orthogonal, never suppressed by disengage (T3) ---------
     eq = answers.get("use_equipment_now")
     if eq is not None and eq["noul"] > EQUIP_ABOVE and "equipment" in capabilities:

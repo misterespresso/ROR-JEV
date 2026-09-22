@@ -77,6 +77,9 @@ COMMAND_SPECS: dict[str, CommandSpec] = {
     "DISENGAGE": CommandSpec(
         "DISENGAGE", False, "withdrawal condition reached, or bounded deadline", 8_000
     ),
+    "SET_TARGET_PRIORITY": CommandSpec(
+        "SET_TARGET_PRIORITY", False, "target priority applied", 1_000
+    ),
     # Posture and equipment never occupy the task slot: they are orthogonal channels.
     "SET_POSTURE": CommandSpec("SET_POSTURE", False, "posture update applied", 1_000),
     "USE_EQUIPMENT": CommandSpec(
