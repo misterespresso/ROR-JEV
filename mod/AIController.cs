@@ -964,6 +964,28 @@ namespace Rainflayer
         }
 
         private const float BARREL_REFLEX_RANGE = 6f;   // jev-11: 4 m missed barrels walked past
+        private const float TRAVEL_FIRE_RANGE = 40f;
+
+        /// <summary>
+        /// Shoot at whatever is in range while navigation drives the movement (build 16).
+        /// Aim and skills only -- moveVector belongs to the pathfinder this frame.
+        /// </summary>
+        private void FireWhileTravelling(CharacterBody body)
+        {
+            if (entityDetector == null || combatController == null || body.inputBank == null)
+                return;
+            GameObject target = LockTarget(body, entityDetector.FindBestTarget(
+                maxRange: TRAVEL_FIRE_RANGE, fovDegrees: 360f, requireLineOfSight: true));
+            if (target == null || !IsGameObjectValid(target))
+                return;
+            Vector3 targetPos = target.transform.position;
+            Vector3 playerPos = body.transform.position;
+            Vector3 dir = (targetPos - playerPos).normalized;
+            Vector3 saved = body.inputBank.moveVector;
+            combatController.ApplyAimControl(body, dir, targetPos, playerPos);
+            combatController.ApplySkillControl(body, Vector3.Distance(playerPos, targetPos));
+            body.inputBank.moveVector = saved;      // skills must not steer; the path does
+        }   // jev-11: 4 m missed barrels walked past
 
         private float arrivalHoldUntil;
         private const float ARRIVAL_HOLD_S = 3f;
@@ -1490,9 +1512,13 @@ namespace Rainflayer
                     }
                     else
                     {
-                        // Still navigating - pathfinding has priority over combat movement.
+                        // Still navigating - pathfinding has priority over combat MOVEMENT.
                         // Returning here prevents combat logic from overwriting the movement
                         // direction set by NodeGraph pathfinding in HandleGotoNavigation.
+                        // ROR-JEV (build 16, jev-12): but aim and fire anyway. The character used
+                        // to walk into enemies and take the hits without shooting back, and the
+                        // brain needs two ticks (~4 s) to switch to fighting.
+                        FireWhileTravelling(body);
                         return;
                     }
                 }

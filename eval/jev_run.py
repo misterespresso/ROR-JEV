@@ -1,6 +1,6 @@
 """JEV drives: poll the game, ask JEV, carry out its picks. The first closed loop.
 
-Every `--decide-every` seconds (default 2) while the character is alive in a run:
+Every `--decide-every` seconds (default 1) while the character is alive in a run:
 
     stock queries + QUERY_OBSERVATION -> adapter -> registry -> built request
       -> JEV (brain/jev_client.py) -> dispatcher (brain/policy.py)
@@ -102,7 +102,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="JEV drives the character")
     ap.add_argument("--run-id", default=time.strftime("jev-%Y%m%d-%H%M%S"))
     ap.add_argument("--minutes", type=float, default=15.0)
-    ap.add_argument("--decide-every", type=float, default=2.0)
+    # Measured over 578 calls: JEV answers in 505 ms median, 720 ms p99, and a tick costs
+    # ~0.7 s including the query sweep -- so 1 s keeps up, and a redirect (two ticks) reacts in
+    # 2 s instead of 4. 60 req/min against a 1,200 limit, ~$0.43/hour.
+    ap.add_argument("--decide-every", type=float, default=1.0)
     ap.add_argument("--survivor", default=None)
     ap.add_argument("--difficulty", default=None)
     ap.add_argument("--dry-run", action="store_true", help="ask JEV but send no commands")

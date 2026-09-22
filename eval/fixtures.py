@@ -66,7 +66,7 @@ BANDED_BASE: dict = {
                 "incoming_projectiles": "none", "in_hazard_volume": False},
     "economy": {"gold_band": "can_afford_one", "candidates": []},
     "objective": {"phase": "pre_teleporter", "teleporter_found": True,
-                  "affordable_left_here": "a little",
+                  "unopened_left_here": "a little", "affordable_left_here": "a little",
                   "teleporter_charge_band": "not_started"},
     "build": {"identity": "undefined", "key_items": []},
     "control": {"active_action": None, "progress_band": "advancing",

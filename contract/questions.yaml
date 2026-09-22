@@ -30,7 +30,8 @@ game_primer:
   - "When health is full and few enemies are near, opening an affordable chest is usually the best use of time: items are the main way to get stronger besides levelling up."
   - "Difficulty rises with run time, from Easy through Medium, Hard and worse: the same enemies hit harder and take more killing later. `run.difficulty_band` is how far that has gone."
   - "A stage ends only by starting the teleporter, surviving the boss, and leaving through it. Staying on one stage forever makes every later fight harder and finishes nothing."
-  - "Once `objective.affordable_left_here` is nothing and health is good, starting the teleporter is usually the right move. `run.stage_time_band` says how long this stage has taken: fresh, settled, or overdue."
+  - "Once `objective.unopened_left_here` is nothing -- the stage is picked clean -- and health is good, starting the teleporter is usually the right move. `run.stage_time_band` says how long this stage has taken: fresh, settled, or overdue."
+  - "`objective.unopened_left_here` counts what is still unopened here; `objective.affordable_left_here` counts what the character can pay for right now. Chests it cannot afford yet are a reason to fight for gold, not a reason to leave."
 
 questions:
 
@@ -159,7 +160,8 @@ dynamic_question_templates:
     name_pattern: "worth_{action_id}"
     generated_from: registry.records[requires_worth_gate == true]
     required_state_fields: [economy.gold_band, self.hp_band, build.identity,
-                            run.stage_time_band, objective.affordable_left_here]
+                            run.stage_time_band, objective.unopened_left_here,
+                            objective.affordable_left_here]
     policy_consumers:
       - dispatch.task_channel.gates_satisfied
     references_answers: []
@@ -381,7 +383,8 @@ payload:
         instructions: >-
           Is starting the boss event at teleporter `{entity_id}` worth it right now, given
           `self.hp_band`, `build.identity`, `run.time_band`, `run.stage_time_band` and
-          `objective.affordable_left_here`? The stage ends only through the teleporter, and
+          `objective.unopened_left_here` and `objective.affordable_left_here`? The stage ends
+          only through the teleporter, and
           waiting has its own cost: `run.difficulty_band` rises with time, so the boss and
           every later stage get harder the longer this one lasts.
         criteria:

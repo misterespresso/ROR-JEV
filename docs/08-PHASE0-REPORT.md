@@ -176,6 +176,8 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F47 | Barrels were run past for five runs | **fixed in build 14** — free, so opened in passing as a reflex |
 | F48 | **A gate-refused pick deadlocked the tick**: JEV re-picked it every 2 s and nothing was sent | **fixed** — a refused action is withheld for 30 s |
 | F49 | **No run ever left stage 1**: nothing in state said how long the stage had taken, what was left, or that difficulty climbs | **fixed** — `run.stage_time_band`, `run.difficulty_band`, `objective.affordable_left_here`, primer and worth-gate text |
+| F50 | **The character never shot while travelling**: it walked into enemies and took the hits | **fixed in build 16** — aim and fire while the pathfinder steers |
+| F51 | **Broke at stage start read as "stage finished"**, so JEV went straight for the teleporter | **fixed** — `objective.unopened_left_here` separate from what is affordable |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1434,6 +1436,30 @@ stopped jev-01's death is untouched.
 Also from jev-11: a walk is redirected when JEV wants anything other than the current target two
 ticks running (requiring the SAME alternative twice was too strict -- its second choice moves
 around), and the barrel reflex reaches 6 m rather than 4 m, which was missing barrels walked past.
+
+
+### F50 — Walking into enemies without shooting back
+
+jev-12: the character walked into a fire enemy while heading for a chest and simply took it. The
+navigation branch of `FixedUpdateAI` returns before aim and skill control, so nothing fired while
+a `GOTO_ID` was running -- and the brain needs two ticks to switch to fighting. Build 16 fires
+while travelling: `FireWhileTravelling` aims and uses skills at a locked target within 40 m with a
+clear shot, and restores `moveVector` afterwards so the pathfinder keeps the movement.
+
+### F51 — "Nothing affordable" is not "nothing left"
+
+Also jev-12: at stage start the character is broke, so F49's `affordable_left_here` read `nothing`
+-- which the primer treats as "this stage is picked clean, start the teleporter" -- and JEV went
+hunting the teleporter immediately. Now `objective.unopened_left_here` counts what is still
+unopened here regardless of price, `affordable_left_here` counts what can be paid for now, and the
+primer says plainly that chests it cannot afford yet are a reason to fight for gold, not to leave.
+
+### Decision rate
+
+Measured over 578 calls: JEV answers in **505 ms median, 619 p90, 720 p99, 805 max**; a tick costs
+~0.7 s including the query sweep; requests are ~2,856 input tokens. The default moves from 2 s to
+**1 s**: 60 requests a minute against a 1,200/min limit, ~$0.43/hour, and a redirect (two ticks)
+now reacts in 2 s instead of 4. Below 1 s the p99 answer would not land before the next tick.
 
 ---
 

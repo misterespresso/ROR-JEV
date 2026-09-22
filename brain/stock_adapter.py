@@ -189,6 +189,10 @@ def _stage_time_band(elapsed_s) -> str:
     return UNKNOWN
 
 
+def _count_band(n: int) -> str:
+    return "nothing" if n == 0 else "a little" if n <= 2 else "plenty"
+
+
 def _left_here_band(cands: list[dict]) -> str:
     """How much is still worth stopping for on this stage: affordable or free candidates.
 
@@ -197,7 +201,15 @@ def _left_here_band(cands: list[dict]) -> str:
     """
     n = sum(1 for c in cands if c.get("cost_band") in ("affordable", "free")
             and not str(c.get("type", "")).startswith("teleporter"))
-    return "nothing" if n == 0 else "a little" if n <= 2 else "plenty"
+    return _count_band(n)
+
+
+def _unopened_here_band(cands: list[dict]) -> str:
+    """Everything still unopened here, affordable or not (jev-12: at stage start the character
+    is broke, so "nothing affordable" read as "this stage is finished" and JEV went straight for
+    the teleporter)."""
+    return _count_band(sum(1 for c in cands
+                           if not str(c.get("type", "")).startswith("teleporter")))
 
 
 #: The mod's CostTypeIndex names -> the registry's cost types.
@@ -474,6 +486,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                                                    if i.get("cost_type") == "gold"]),
                     "candidates": cands},
         "objective": {"phase": phase, "teleporter_found": tp_found,
+                      "unopened_left_here": _unopened_here_band(cands),
                       "affordable_left_here": _left_here_band(cands),
                       "teleporter_charge_band": (
                           "complete" if stock_phase == "teleporter_charged"
