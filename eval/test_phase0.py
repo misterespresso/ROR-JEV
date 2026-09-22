@@ -480,8 +480,8 @@ def trace_shrine_classification():
     check("named Shrine of Chance in range is offerable",
           any(k.startswith("use_shrine_chance") for k in reg2), str(sorted(reg2)))
     rec = next(v for k, v in reg2.items() if k.startswith("use_shrine_chance"))
-    check("and it is irreversible with a worth gate required",
-          rec.commitment == "irreversible" and rec.requires_worth_gate)
+    check("jev-16: a shrine gamble is `costly`, not one-way -- no worth gate",
+          rec.commitment == "costly" and not rec.requires_worth_gate)
 
 
 def trace_adapter_refuses_to_invent():

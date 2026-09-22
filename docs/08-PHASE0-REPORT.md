@@ -180,6 +180,9 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F51 | **Broke at stage start read as "stage finished"**, so JEV went straight for the teleporter | **fixed** — `objective.unopened_left_here` separate from what is affordable |
 | F54 | **Walked to a drone six times and never repaired it**: the option said nothing about what the drone does, and argued against itself | **fixed** — a kind per drone with what it does; neutral text; walks to a repeatedly-declined target withheld |
 | F55 | **Still would not start the teleporter** (worth 0.64 of 0.75): unaffordable chests kept the stage looking unfinished and split the vote | **fixed** — no walks to what it cannot pay for; boss scaling and "picked over" stated |
+| F56 | **Three runs were read as testing code the game had never loaded**: the DLL loads at startup | **fixed in build 18** — the snapshot reports `mod_build` and the loop warns loudly |
+| F57 | **A tall object blocked its own line of sight**, so shrines could never be "seen" | **fixed in build 18** |
+| F58 | The Shrine of Chance was never used in seven runs (worth 0.26-0.53 of 0.75) | **decided** — reclassified `costly`: gold for a chance at an item is not a one-way decision |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1505,6 +1508,34 @@ Two causes, both about offering choices that were not really choices:
 Re-asked on jev-15's own stalled ticks: **worth 0.78-0.80** (needs above 0.75) with the pick at
 0.69-0.76 (needs 0.55) -- authorised. Before these changes the same ticks gave worth 0.51-0.75 and
 picks of 0.39-0.55.
+
+
+### F56 — Three runs tested code the game had never loaded
+
+jev-14, jev-15 and jev-16 were read as evidence about builds 16 and 17. None of their frames
+carry build 17's `unseen` field: the game had been launched before those deploys, and BepInEx
+loads the DLL at startup. `tools/deploy.py` only warns that the game must be CLOSED to deploy --
+it cannot know whether the session that comes back was started afterwards.
+
+Build 18 reports `mod_build` in every snapshot; `eval/jev_run.py` compares it with
+`EXPECTED_MOD_BUILD` on the first frame, records it, and prints a loud warning. **Deploying is
+not enough: the game must be restarted afterwards.**
+
+### F57 — A shrine blocked its own line of sight
+
+Build 17's `HasSeen` raycasts from the aim origin to the object's position plus 1 m. For a tall
+object that endpoint is inside its own collider, so the ray hit the shrine itself and it was
+never marked seen -- invisible to the brain for the whole stage. The check now ignores a hit on
+the target's own transform.
+
+### F58 — The Shrine of Chance, seven runs unused
+
+`worth_use_shrine_chance` answered 0.26-0.53 against 0.75, every time it was asked.
+`06-ACTION-REGISTRY.md` classes it `irreversible`, alongside starting the teleporter. It is not
+in the same family: it spends gold for a chance at an item, can be tried again, and leaves the
+run in the same shape either way. Reclassified `costly` -- the 0.50 probability gate stands, the
+worth Noul does not apply. jev-10 shows JEV picking it at ~0.9 when standing at one, so it will
+now fire. The deviation from the registry table is deliberate and recorded here.
 
 ---
 

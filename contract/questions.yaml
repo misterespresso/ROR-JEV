@@ -226,8 +226,8 @@ payload:
         what: "Open the {cost_band} chest you are standing at. Spends gold, guaranteed item."
         not_for: "When gold is better saved or the route is unsafe."
       use_shrine_chance:
-        what: "Gamble at the Shrine of Chance you are standing at. Spends gold, may give nothing."
-        not_for: "Runs that cannot afford to lose the gold."
+        what: "Gamble at the Shrine of Chance you are standing at ({cost_band}). Spends gold for a chance at an item; it can be tried again while it lasts."
+        not_for: "Gold that a guaranteed chest needs."
       start_teleporter:
         what: "Begin the boss event at the teleporter you are standing at. Irreversible."
         not_for: "A character too weak for the boss, or reachable loot with time to take it."

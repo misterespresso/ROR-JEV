@@ -159,14 +159,15 @@ def trace_two_observations_one_token():
 def trace_gates_and_range():
     print("\nT1 / item 4: fail-closed gate, range and cost enforcement")
     mod = FakeMod()
-    mod.add(Entity("entity-51", "shrine_chance", cost=30, distance=2.0))
+    # jev-16: a Shrine of Chance is `costly` now, so the gated example is the teleporter.
+    mod.add(Entity("entity-51", "teleporter_idle", cost=0, distance=2.0))
     obs = mod.observe()
     reg = build_registry(obs, CAPS, False)
     opts = selectable(reg, False)
 
     # T1: missing required worth gate
     life = Lifecycle()
-    ans = {"next_action": jev_choice(opts, "use_shrine_chance:entity-51")}
+    ans = {"next_action": jev_choice(opts, "start_teleporter:entity-51")}
     out = dispatch(obs, ans, reg, life, CAPS)
     check("T1 missing worth gate -> no command",
           not any(c.command == "INTERACT_TARGET" for c in out.commands))
@@ -175,8 +176,8 @@ def trace_gates_and_range():
 
     # T32: cost above the authorized ceiling, still affordable
     life2 = Lifecycle()
-    ans2 = {"next_action": jev_choice(opts, "use_shrine_chance:entity-51"),
-            "worth_use_shrine_chance:entity-51": noul(0.9)}
+    ans2 = {"next_action": jev_choice(opts, "start_teleporter:entity-51"),
+            "worth_start_teleporter:entity-51": noul(0.9)}
     cmd = dispatch(obs, ans2, reg, life2, CAPS).commands[0]
     mod.entities["entity-51"].cost = 60          # price rose; 140 gold still covers it
     ev = mod.send(cmd)

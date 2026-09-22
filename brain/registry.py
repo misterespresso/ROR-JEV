@@ -14,7 +14,12 @@ SENTINELS = {"none", "continue_current_action"}
 VERBS = {
     "navigate":          ("NAVIGATE_TARGET", "reversible",   False, False, "navigate_target"),
     "open_chest":        ("INTERACT_TARGET", "costly",       True,  False, "interact_target"),
-    "use_shrine_chance": ("INTERACT_TARGET", "irreversible", True,  True,  "interact_target"),
+    # jev-10..jev-16: never once used. The worth gate answered 0.26-0.53 against 0.75, every
+    # time. A Shrine of Chance is gold for a chance at an item, repeatable, and nothing about
+    # the run is one-way afterwards -- that is a chest-shaped gamble, not the class
+    # 06-ACTION-REGISTRY.md reserves for decisions that cannot be undone. Reclassified
+    # `costly`: the 0.50 probability gate stands, the worth Noul does not apply.
+    "use_shrine_chance": ("INTERACT_TARGET", "costly",       True,  False, "interact_target"),
     "use_shrine_blood":  ("INTERACT_TARGET", "irreversible", True,  True,  "interact_target"),
     "start_teleporter":  ("INTERACT_TARGET", "irreversible", True,  True,  "interact_target"),
     "advance_stage":     ("INTERACT_TARGET", "irreversible", True,  True,  "interact_target"),

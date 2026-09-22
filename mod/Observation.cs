@@ -26,6 +26,9 @@ namespace Rainflayer
     /// </summary>
     internal static class Observation
     {
+        /// <summary>The fork build number, reported in every snapshot (build 18+).</summary>
+        public const int MOD_BUILD = 18;
+
         /// <summary>Environmental damage within this window counts as "taking" it now.</summary>
         const float ENV_DAMAGE_WINDOW_S = 2f;
 
@@ -64,7 +67,11 @@ namespace Rainflayer
             Vector3 from = body.aimOrigin;
             Vector3 to = go.transform.position + Vector3.up;
             Vector3 d = to - from;
-            if (Physics.Raycast(from, d.normalized, d.magnitude, LayerMask.GetMask("World")))
+            RaycastHit hit;
+            // The object's OWN collider sits at the far end of this ray: a tall shrine would
+            // block its own line of sight and never be seen at all (jev-16).
+            if (Physics.Raycast(from, d.normalized, out hit, d.magnitude, LayerMask.GetMask("World"))
+                && hit.collider != null && !hit.collider.transform.IsChildOf(go.transform))
                 return false;
             seenIds.Add(id);
             return true;
@@ -98,6 +105,10 @@ namespace Rainflayer
             {
                 P("type", S("OBSERVATION")),
                 P("v", "1"),
+                // ROR-JEV (build 18): which fork build is actually loaded. jev-14..16 ran on a
+                // DLL deployed two builds earlier -- the game only loads it at startup -- and
+                // nothing said so, so three runs were read as if the new code were in.
+                P("mod_build", MOD_BUILD.ToString(CultureInfo.InvariantCulture)),
                 P("t_mono_ms", F(Time.realtimeSinceStartup * 1000f)),
             };
 

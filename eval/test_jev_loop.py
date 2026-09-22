@@ -292,15 +292,17 @@ def trace_stuck_walk():
 def trace_refused_action_is_withheld():
     print("\njev-10: a gate-refused action is withheld, so the next tick moves on")
     fr = frames(True)
-    fr["QUERY_OBSERVATION"]["interactables"]["items"].append(
-        {"id": -55555, "kind": "purchase", "prefab": "ShrineChance", "display": "Shrine of Chance",
-         "cost": 25, "cost_type": "Money", "distance": 3.0, "height": 0.0})
+    # The teleporter is the gated example now (a shrine is `costly`), and it comes from the
+    # stock list, not the mod's.
+    fr["QUERY_INTERACTABLES"]["interactables"] = [
+        {"type": "teleporter", "name": "Teleporter", "cost": 0, "distance": 3.0,
+         "charged": False, "bossActive": False, "chargePercent": 0.0}]
     asked: list = []
 
     def fake(wire, **_kw):
         asked.append(wire)
         opts = wire["questions"]["next_action"]["criteria"]
-        choice = next((k for k in opts if k.startswith("use_shrine_chance")), "explore")
+        choice = next((k for k in opts if k.startswith("start_teleporter")), "explore")
         ans = {"next_action": {"type": "choice", "choice": choice, "confidence": 0.9,
                                "probabilities": {choice: 0.9}}}
         for q in wire["questions"]:
@@ -315,16 +317,17 @@ def trace_refused_action_is_withheld():
     from brain.catalog import load_contract
     from eval.fixtures import MILESTONE_1_CAPABILITIES
     jev_run.loop(p, rec, a, load_contract(), frozenset(MILESTONE_1_CAPABILITIES), stop)
-    check("the shrine is offered on the first tick",
-          any(k.startswith("use_shrine_chance") for k in asked[0]["questions"]["next_action"]["criteria"]))
+    check("the teleporter is offered on the first tick",
+          any(k.startswith("start_teleporter") for k in asked[0]["questions"]["next_action"]["criteria"]),
+          str(sorted(asked[0]["questions"]["next_action"]["criteria"])))
     check("the worth gate refuses it",
           any(f.get("not_authorized") == "worth_gate" for f in rec.frames), str(rec.frames[:3]))
     check("and it is withheld afterwards",
-          all(not any(k.startswith("use_shrine_chance") for k in w["questions"]["next_action"]["criteria"])
+          all(not any(k.startswith("start_teleporter") for k in w["questions"]["next_action"]["criteria"])
               for w in asked[1:]), str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
     check("so something else is sent instead", ("MODE", "roam") in p.commands, str(p.commands))
-    check("and walking back to the same shrine is withheld too",
-          all(not any(k.startswith("navigate:shrine_chance") for k in w["questions"]["next_action"]["criteria"])
+    check("and walking back to the same teleporter is withheld too",
+          all(not any(k.startswith("navigate:teleporter") for k in w["questions"]["next_action"]["criteria"])
               for w in asked[1:]),
           str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
 

@@ -65,6 +65,10 @@ STUCK_AFTER_S = 12.0
 STUCK_PROGRESS_M = 1.0
 QUARANTINE_S = 60.0
 
+#: jev-16: the character ran at a wall it could not climb, gave up, and came back to the same
+#: place. What the pathfinder could not reach once is usually still unreachable a minute later.
+UNREACHABLE_QUARANTINE_S = 180.0
+
 #: jev-10: JEV chose the Shrine of Chance, the worth gate refused it (0.26-0.53 against 0.75),
 #: the tick sent nothing, and the next tick chose it again -- the character stood at the shrine.
 #: A refused action is withheld from the options this long, so the next pick is a different one.
@@ -78,6 +82,10 @@ DECLINE_LIMIT = 3
 
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
+
+#: The build this brain was written against. The mod reports its own in every snapshot; if they
+#: differ, the game was launched before the last deploy and the run proves nothing about it.
+EXPECTED_MOD_BUILD = "18"
 
 EVENT_STATE = {"action_started": State.NAVIGATING, "action_complete": State.COMPLETED,
                "action_failed": State.FAILED}
@@ -173,6 +181,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     last_line = 0.0
     last_choice = "-"
     redirect = {"to": None, "n": 0}
+    build_checked = {"done": False}
     quarantined: dict[str, float] = {}
     refused: dict[str, float] = {}
     declined: dict[str, int] = {}
@@ -192,6 +201,15 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         t_next = now + a.decide_every
         got = poll(p, st)
         obs = got.get("QUERY_OBSERVATION")
+        if obs and not build_checked["done"]:
+            build_checked["done"] = True
+            running = obs.get("mod_build")
+            rec.record({"type": "HARNESS_NOTE", "note": "mod_build", "running": running,
+                        "expected": EXPECTED_MOD_BUILD})
+            if running != EXPECTED_MOD_BUILD:
+                print(f"  !! The game is running fork build {running or '<16 or older>'}, not "
+                      f"{EXPECTED_MOD_BUILD}. Close the game, `python tools/deploy.py`, and")
+                print("     START IT AGAIN -- the DLL is loaded at startup (jev-14..16 ran stale).")
 
         # --- task bookkeeping: events, then the fallbacks F25 makes necessary -----------
         for ev in p.events[seen_events:]:
@@ -199,7 +217,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             if task and state and str(ev.get("command")) == task.label:
                 life.on_event(task.command_id, state, str(ev.get("reason") or "") or None)
                 if state is State.FAILED and str(ev.get("reason")) == "unreachable" and task.target_iid:
-                    quarantined[str(task.target_iid)] = now + QUARANTINE_S
+                    quarantined[str(task.target_iid)] = now + UNREACHABLE_QUARANTINE_S
                 if state in (State.COMPLETED, State.FAILED):
                     rec.record({"type": "HARNESS_NOTE", "note": "task_ended",
                                 "label": task.label, "how": ev.get("event_type"),
@@ -224,9 +242,9 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                 why, state = f"objective changed {task.objective} -> {st.objective}", State.COMPLETED
             elif (task.best_m is not None and now - task.best_at > STUCK_AFTER_S
                   and task.label.startswith("GOTO_ID:")):
-                quarantined[str(task.target_iid)] = now + QUARANTINE_S
+                quarantined[str(task.target_iid)] = now + UNREACHABLE_QUARANTINE_S
                 why, state = (f"no closer than {task.best_m:.0f} m in {STUCK_AFTER_S:g}s "
-                              f"-- set aside for {QUARANTINE_S:g}s"), State.FAILED
+                              f"-- set aside for {UNREACHABLE_QUARANTINE_S:g}s"), State.FAILED
             elif now - task.since > task.timeout_s:
                 why, state = f"no outcome within {task.timeout_s:g}s", State.FAILED
             if why:

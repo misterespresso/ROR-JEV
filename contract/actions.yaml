@@ -28,9 +28,9 @@ verbs:
     capability: interact_target
   use_shrine_chance:
     command: INTERACT_TARGET
-    commitment: irreversible
+    commitment: costly
     range_gated: true
-    requires_worth_gate: true
+    requires_worth_gate: false
     capability: interact_target
   use_shrine_blood:
     command: INTERACT_TARGET
