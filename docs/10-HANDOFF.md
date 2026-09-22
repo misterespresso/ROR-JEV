@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **304 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 7** `CF618C83…` (`python tools/deploy.py --status`) |
+| Deployed | **build 8** `3B629A10…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -29,7 +29,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **no falls** — fork-09 (6 min, Verdant Falls, 274 frames with enemies, 0 environmental damage); minor stalls on terrain, recovered; accepted — no more movement tuning |
 | 6 | `OBSERVATION` gains `interactables`: every purchase and barrel on the stage, instance IDs, cost type, shop/printer items | **yes** — fork-10: all 17 stage interactables, printer items; fork-11: **barrels found** (5 per frame; fork-10's stage had none), 3 shop terminals with items |
 | 7 | Edge check walks drops ≤ 8 m; after 2 s cornered, escapes over the shortest drop (fork-10 was stuck a minute on a dome) | **deployed** `CF618C83…` from `74f106b`; not yet run |
-| 8 | `INTERACT_ID <instance id>`: go to the one object JEV picked and interact; events labelled `INTERACT_ID:<id>` | built from `ff93341`; **not deployed** (game was running) |
+| 8 | `INTERACT_ID <instance id>`: go to the one object JEV picked and interact; events labelled `INTERACT_ID:<id>` | **deployed** `3B629A10…` from `ff93341`; not yet run |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
