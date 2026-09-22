@@ -318,6 +318,10 @@ def trace_refused_action_is_withheld():
           all(not any(k.startswith("use_shrine_chance") for k in w["questions"]["next_action"]["criteria"])
               for w in asked[1:]), str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
     check("so something else is sent instead", ("MODE", "roam") in p.commands, str(p.commands))
+    check("and walking back to the same shrine is withheld too",
+          all(not any(k.startswith("navigate:shrine_chance") for k in w["questions"]["next_action"]["criteria"])
+              for w in asked[1:]),
+          str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
 
 
 def trace_dead_asks_nothing():

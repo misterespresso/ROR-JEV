@@ -1393,7 +1393,9 @@ tick sent nothing. Next tick: same options, same choice, same refusal.
 The gate is the design working (`06-ACTION-REGISTRY.md`: irreversible actions carry a worth Noul,
 and a shrine gamble is one-way). The deadlock is not. A gate-refused action is now withheld from
 the options for 30 s, so the next tick's pick is a different one and the run moves on; the
-refusal still stands and is still recorded.
+refusal still stands and is still recorded. Walking back to the same object is withheld with it:
+the person watching described the full cycle -- refused, stand, roam off, walk back, refused --
+and withholding only the interaction would have left the walk in place.
 
 **Worth watching:** JEV rates the Shrine of Chance 0.26-0.53 consistently, well under 0.75, so
 shrines will rarely be used. That is JEV's judgement of a gamble, not a defect -- but if shrines

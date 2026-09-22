@@ -292,7 +292,12 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         for note in d.notes:
             rec.record({"type": "HARNESS_NOTE", "note": "dispatch", **note})
             if note.get("not_authorized") and note.get("action"):
-                refused[str(note["action"])] = now + REFUSED_SUPPRESS_S
+                aid = str(note["action"])
+                refused[aid] = now + REFUSED_SUPPRESS_S
+                # ...and walking back to it: jev-10 refused at the shrine, roamed off, walked
+                # back, was refused again. While the interaction is withheld, so is the trip.
+                if ":" in aid:
+                    refused[f"navigate:{aid.split(':', 1)[1]}"] = now + REFUSED_SUPPRESS_S
         sel = res.answers.get("next_action") or {}
         last_choice = f"{sel.get('choice', '-')} p={max((sel.get('probabilities') or {0: 0}).values()):.2f}" if sel else "-"
         for cmd in d.commands:
