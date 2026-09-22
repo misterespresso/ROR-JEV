@@ -28,6 +28,9 @@ game_primer:
   - "A strong stage: fight the enemies nearby, open the chests the character can afford, then start the teleporter once the character is strong enough to beat a boss."
   - "A fight that is going well is worth finishing. Walking away from damaged enemies throws away the damage already dealt."
   - "When health is full and few enemies are near, opening an affordable chest is usually the best use of time: items are the main way to get stronger besides levelling up."
+  - "Difficulty rises with run time, from Easy through Medium, Hard and worse: the same enemies hit harder and take more killing later. `run.difficulty_band` is how far that has gone."
+  - "A stage ends only by starting the teleporter, surviving the boss, and leaving through it. Staying on one stage forever makes every later fight harder and finishes nothing."
+  - "Once `objective.affordable_left_here` is nothing and health is good, starting the teleporter is usually the right move. `run.stage_time_band` says how long this stage has taken: fresh, settled, or overdue."
 
 questions:
 
@@ -155,7 +158,8 @@ dynamic_question_templates:
     type: noul
     name_pattern: "worth_{action_id}"
     generated_from: registry.records[requires_worth_gate == true]
-    required_state_fields: [economy.gold_band, self.hp_band, build.identity]
+    required_state_fields: [economy.gold_band, self.hp_band, build.identity,
+                            run.stage_time_band, objective.affordable_left_here]
     policy_consumers:
       - dispatch.task_channel.gates_satisfied
     references_answers: []
@@ -230,13 +234,13 @@ payload:
       open_barrel:                                 # jev-03
         what: "Open the barrel you are standing at. Free; gives a little gold and experience."
       open_equipment_barrel:                       # jev-03
-        what: "Open the equipment barrel you are standing at. Spends gold; gives a random equipment item, which replaces any equipment carried."
+        what: "Open the equipment barrel you are standing at ({cost_band}). Spends gold; gives a random equipment item, which replaces any equipment carried."
         not_for: "When the gold is needed for a chest."
       buy_from_terminal:                           # jev-03
-        what: "Buy {item} from the shop terminal you are standing at. Spends gold; the item is known before paying."
+        what: "Buy {item} from the shop terminal you are standing at ({cost_band}). Spends gold; the item is known before paying."
         not_for: "An item that does not fit `build.identity`, or an unknown item when a chest is affordable."
       repair_drone:                                # jev-03
-        what: "Repair the broken drone you are standing at. Spends gold; it then fights alongside the character."
+        what: "Repair the broken drone you are standing at ({cost_band}). Spends gold that a chest could have used; it then fights alongside the character until it is destroyed."
         not_for: "When the gold is needed for a chest."
       fight_nearby:                                # jev-02
         what: "Stay and fight the enemies nearby until they are dead. Kills give gold and experience."
@@ -376,7 +380,10 @@ payload:
       start_teleporter:                            # AUTHORED-IN-PHASE-0
         instructions: >-
           Is starting the boss event at teleporter `{entity_id}` worth it right now, given
-          `self.hp_band`, `build.identity` and `run.time_band`?
+          `self.hp_band`, `build.identity`, `run.time_band`, `run.stage_time_band` and
+          `objective.affordable_left_here`? The stage ends only through the teleporter, and
+          waiting has its own cost: `run.difficulty_band` rises with time, so the boss and
+          every later stage get harder the longer this one lasts.
         criteria:
           "true": "The character is ready for the boss and the run gains from starting now."
           "false": "More preparation is worth the time it costs."

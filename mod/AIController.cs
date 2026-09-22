@@ -963,7 +963,7 @@ namespace Rainflayer
             return best;
         }
 
-        private const float BARREL_REFLEX_RANGE = 4f;
+        private const float BARREL_REFLEX_RANGE = 6f;   // jev-11: 4 m missed barrels walked past
 
         private float arrivalHoldUntil;
         private const float ARRIVAL_HOLD_S = 3f;

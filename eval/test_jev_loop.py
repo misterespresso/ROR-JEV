@@ -259,9 +259,14 @@ def trace_redirect():
     gotos = [c for c in p.commands if c[0] == "GOTO_ID"]
     check("walk to the chest, then redirected to the barrel", gotos == [("GOTO_ID", str(CHEST)), ("GOTO_ID", "-97000")], str(gotos))
     check("the redirect is recorded", any(f.get("note") == "task_redirected" for f in rec.frames))
-    p, rec = go(["chest_small", "barrel", "chest_small", "barrel"])
+    p, rec = go(["chest_small", "chest_small", "chest_small", "chest_small"])
     gotos = [c for c in p.commands if c[0] == "GOTO_ID"]
-    check("a flicker (not two ticks running) does not redirect", gotos == [("GOTO_ID", str(CHEST))], str(gotos))
+    check("still wanting the same target does not redirect", gotos == [("GOTO_ID", str(CHEST))], str(gotos))
+    # jev-11: the alternative need not be the same twice -- JEV's second choice moves around.
+    p, rec = go(["chest_small", "barrel", "teleporter", "barrel"])
+    gotos = [c for c in p.commands if c[0] == "GOTO_ID"]
+    check("two ticks wanting anything else redirects to the latest pick",
+          len(gotos) == 2 and gotos[1] != ("GOTO_ID", str(CHEST)), str(gotos))
 
 
 def trace_stuck_walk():

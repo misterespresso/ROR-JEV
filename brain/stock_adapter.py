@@ -146,6 +146,7 @@ def from_observation(obs: dict | None) -> dict | None:
     }
     return {
         "run": {"survivor": survivor or UNKNOWN,
+                "difficulty_band": _difficulty_band(run.get("difficulty_coefficient")),
                 "difficulty": DIFFICULTY_NAMES.get(str(diff), str(diff)) if diff else UNKNOWN,
                 "time_band": _time_band(run.get("elapsed_s"))},
         "self": {"hp_band": _hp_band(slf),
@@ -155,6 +156,48 @@ def from_observation(obs: dict | None) -> dict | None:
         # Build 4+: elite, class and focus facts. None on older frames -> stay unknown.
         "threat": band_threat(obs.get("threat")),
     }
+
+
+#: PROVISIONAL (jev-08..jev-11: no run ever left stage 1). How long the character has been on
+#: THIS stage, which nothing in state said -- so `worth_start_teleporter` was answered 0.12-0.31
+#: every time and the stage never ended. Minutes, upper bound exclusive.
+STAGE_TIME_BANDS_MIN = [(2.0, "fresh"), (5.0, "settled"), (float("inf"), "overdue")]
+
+
+#: PROVISIONAL. RoR2's difficulty climbs with run time (Easy -> ... -> HAHAHA), and the
+#: coefficient is what actually scales enemy health and damage. Cut points are a first guess.
+DIFFICULTY_BANDS = [(1.5, "gentle"), (2.5, "rising"), (4.0, "harsh"), (float("inf"), "brutal")]
+
+
+def _difficulty_band(coefficient) -> str:
+    c = num(coefficient)
+    if c is None or c <= 0:
+        return UNKNOWN
+    for upper, band in DIFFICULTY_BANDS:
+        if c < upper:
+            return band
+    return UNKNOWN
+
+
+def _stage_time_band(elapsed_s) -> str:
+    e = num(elapsed_s)
+    if e is None or e < 0:
+        return UNKNOWN
+    for upper, band in STAGE_TIME_BANDS_MIN:
+        if e / 60.0 < upper:
+            return band
+    return UNKNOWN
+
+
+def _left_here_band(cands: list[dict]) -> str:
+    """How much is still worth stopping for on this stage: affordable or free candidates.
+
+    The teleporter is not one of them -- it is the way out, not something to spend time on, and
+    counting it meant this never read `nothing`.
+    """
+    n = sum(1 for c in cands if c.get("cost_band") in ("affordable", "free")
+            and not str(c.get("type", "")).startswith("teleporter"))
+    return "nothing" if n == 0 else "a little" if n <= 2 else "plenty"
 
 
 #: The mod's CostTypeIndex names -> the registry's cost types.
@@ -303,7 +346,8 @@ def _nearest_band(d: float | None) -> str:
 def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
           *, observation_id: str, seq: int,
           range_m: float = INTERACTION_RANGE_M,
-          observation: dict | None = None) -> Adapted:
+          observation: dict | None = None,
+          stage_elapsed_s: float | None = None) -> Adapted:
     """Build one observation from a matched set of stock query responses.
 
     The caller is responsible for the responses describing roughly the same instant. They
@@ -412,7 +456,8 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         "run": {"survivor": UNKNOWN, "stage": objective.get("scene_name", UNKNOWN)
                 if objective else UNKNOWN,
                 "difficulty": UNKNOWN, "difficulty_band": UNKNOWN,
-                "time_band": UNKNOWN},
+                "time_band": UNKNOWN,
+                "stage_time_band": _stage_time_band(stage_elapsed_s)},
         "self": {"hp_band": UNKNOWN, "hp_trend": UNKNOWN, "barrier_band": UNKNOWN,
                  "skills_ready": UNKNOWN},
         "threat": {"enemies_near": _enemies_band(num(combat.get("enemy_count"))
@@ -429,6 +474,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                                                    if i.get("cost_type") == "gold"]),
                     "candidates": cands},
         "objective": {"phase": phase, "teleporter_found": tp_found,
+                      "affordable_left_here": _left_here_band(cands),
                       "teleporter_charge_band": (
                           "complete" if stock_phase == "teleporter_charged"
                           else "charging" if stock_phase == "charging_teleporter"

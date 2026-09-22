@@ -175,6 +175,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F46 | **A walk that never arrived froze the agent**: 3D arrival radius, and giving up was silent | **fixed in build 14** — horizontal arrival, give-up reported, stuck walks abandoned and set aside |
 | F47 | Barrels were run past for five runs | **fixed in build 14** — free, so opened in passing as a reflex |
 | F48 | **A gate-refused pick deadlocked the tick**: JEV re-picked it every 2 s and nothing was sent | **fixed** — a refused action is withheld for 30 s |
+| F49 | **No run ever left stage 1**: nothing in state said how long the stage had taken, what was left, or that difficulty climbs | **fixed** — `run.stage_time_band`, `run.difficulty_band`, `objective.affordable_left_here`, primer and worth-gate text |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1401,6 +1402,38 @@ and withholding only the interaction would have left the walk in place.
 shrines will rarely be used. That is JEV's judgement of a gamble, not a defect -- but if shrines
 should be taken more often, the lever is `WORTH_THRESHOLD` (0.75, `brain/registry.py`), a design
 constant, not the gate.
+
+
+### F49 — The agent never finished a stage
+
+jev-08 through jev-11: every run stayed on stage 1. `worth_start_teleporter` came back
+**0.12-0.31** each time against the 0.75 an irreversible action needs, so the teleporter was never
+started. Fairly, on what JEV was shown: nothing said how long this stage had taken, whether
+anything was still worth buying here, or that difficulty climbs with run time (the person running
+the project: Easy through to HAHAHA). It saw only "irreversible boss event".
+
+Added, all from facts the mod already sends: `run.stage_time_band` (fresh / settled / overdue,
+from time since the scene changed), `run.difficulty_band` (from `difficulty_coefficient`),
+`objective.affordable_left_here` (nothing / a little / plenty, counting affordable and free
+candidates, excluding the teleporter -- which is the way out, not something to spend time on).
+Two primer facts (a stage ends only through the teleporter; difficulty rises with run time) and
+the worth-gate text now names waiting's own cost.
+
+Asked for real on a jev-11 tick with the teleporter in range:
+
+| stage state | worth_start_teleporter (needs 0.75) |
+|---|---|
+| fresh, chests affordable | 0.43 |
+| settled, nothing affordable | **0.82** |
+| overdue, nothing affordable | **0.83** |
+| overdue, chests still affordable | 0.54 |
+
+So the stage is looted and then left, and `WORTH_THRESHOLD` stays at 0.75 -- the gate that
+stopped jev-01's death is untouched.
+
+Also from jev-11: a walk is redirected when JEV wants anything other than the current target two
+ticks running (requiring the SAME alternative twice was too strict -- its second choice moves
+around), and the barrel reflex reaches 6 m rather than 4 m, which was missing barrels walked past.
 
 ---
 

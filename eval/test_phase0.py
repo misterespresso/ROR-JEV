@@ -560,8 +560,12 @@ def trace_adapter_reads_observation():
     check("2 min in is `plenty`", b["run"]["time_band"] == "plenty")
     check("full hp is `healthy`", b["self"]["hp_band"] == "healthy")
     check("hp_trend stays unknown (needs history)", b["self"]["hp_trend"] == UNKNOWN)
-    check("difficulty_band stays unknown (no cut points)",
-          b["run"]["difficulty_band"] == UNKNOWN)
+    check("difficulty is banded from the coefficient (jev-11: rises with run time)",
+          b["run"]["difficulty_band"] == "gentle", str(b["run"]))
+    from brain.stock_adapter import _difficulty_band
+    check("and climbs with it", (_difficulty_band(1.1), _difficulty_band(2.0),
+                                 _difficulty_band(3.0), _difficulty_band(9.0))
+          == ("gentle", "rising", "harsh", "brutal"))
     check("hazards become a measured block",
           b["hazards"] == {"taking_environmental_damage": False, "active_dots": [],
                            "projectiles_near": "none", "in_void_fog": False}, str(b["hazards"]))

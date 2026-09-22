@@ -50,8 +50,10 @@ TASK_TIMEOUT_S = {"GOTO_ID": 60.0}
 TASK_TIMEOUT_DEFAULT_S = 30.0
 
 #: jev-06: JEV preferred another target for 40 s of a 42 s walk and could not say so. A walk is
-#: redirected when JEV picks the SAME other walk/interaction this many ticks running, each at
-#: least REDIRECT_MIN_P -- enough to follow a real change of mind, not every flicker.
+#: redirected when JEV wants something OTHER than the current walk this many ticks running, each
+#: at least REDIRECT_MIN_P, and it goes to the latest pick. jev-11: requiring the same
+#: alternative twice was too strict -- JEV's second choice moves around, so a walk it had
+#: given up on ran to the end anyway.
 REDIRECT_TICKS = 2
 REDIRECT_MIN_P = 0.50
 
@@ -241,7 +243,9 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             obs["interactables"] = block
         ad = adapt(got["QUERY_OBJECTIVE"], got["QUERY_INVENTORY"], got["QUERY_COMBAT_STATUS"],
                    got["QUERY_INTERACTABLES"], observation_id=f"{a.run_id}-{n}", seq=n,
-                   observation=obs)
+                   observation=obs,
+                   stage_elapsed_s=(time.monotonic() - st.stage_started_at
+                                    if st.stage_started_at is not None else None))
         ad.raw["t_capture_mono_ms"] = int(now * 1000)
         active = life.has_active_task()
         reg = build_registry(ad.raw, set(caps), active)
@@ -278,8 +282,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                  and pick in reg and pick != life.task.action_id
                  and pick.split(":")[0] not in ("fight_nearby", "explore")
                  and p_pick >= REDIRECT_MIN_P)
-        redirect = ({"to": pick, "n": redirect["n"] + 1 if redirect["to"] == pick else 1}
-                    if other else {"to": None, "n": 0})
+        redirect = ({"to": pick, "n": redirect["n"] + 1} if other else {"to": None, "n": 0})
         if redirect["n"] >= REDIRECT_TICKS:
             rec.record({"type": "HARNESS_NOTE", "note": "task_redirected", "from": task.label,
                         "to": pick, "p": round(p_pick, 2)})
