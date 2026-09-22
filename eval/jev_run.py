@@ -31,7 +31,7 @@ from brain.catalog import BuildContext, build_request, load_contract
 from brain.contract import State
 from brain.jev_client import JevError, ask, have_key
 from brain.lifecycle import Lifecycle
-from brain.policy import dispatch
+from brain.policy import _gates_satisfied, dispatch
 from brain.recorder import Recorder
 from brain.registry import build_registry
 from brain.stock_adapter import adapt
@@ -85,7 +85,7 @@ BACKOFF_S = {429: 5.0, 529: 5.0}
 
 #: The build this brain was written against. The mod reports its own in every snapshot; if they
 #: differ, the game was launched before the last deploy and the run proves nothing about it.
-EXPECTED_MOD_BUILD = "18"
+EXPECTED_MOD_BUILD = 19
 
 EVENT_STATE = {"action_started": State.NAVIGATING, "action_complete": State.COMPLETED,
                "action_failed": State.FAILED}
@@ -95,12 +95,16 @@ class Task:
     """What the loop knows about the one running task, beyond the Lifecycle slot."""
 
     def __init__(self, command_id: str, label: str, target_iid: str | None, now: float,
-                 objective: str, timeout_s: float):
+                 objective: str, timeout_s: float, description: str, scene: str):
         self.command_id, self.label, self.target_iid, self.since = (
             command_id, label, target_iid, now)
         self.objective, self.timeout_s = objective, timeout_s
+        self.description, self.scene = description, scene
         self.best_m: float | None = None     # closest the target has been
         self.best_at = now
+        self.stop_reason: str | None = None
+        self.stop_origin = "safety:task_release"
+        self.stop_state = State.CANCELLED
 
 
 def available_ids(observation: dict | None) -> set[str] | None:
@@ -111,10 +115,32 @@ def available_ids(observation: dict | None) -> set[str] | None:
     return {str(it.get("id")) for it in block.get("items") or []}
 
 
+def stop_task(p, rec, task: Task, *, origin: str, reason: str, state: State) -> bool:
+    """Stop the mod's navigation before freeing the brain's task slot.
+
+    MODE roam/combat does not clear a GOTO_ID or INTERACT_ID. A Python-only release
+    therefore leaves the character following an abandoned path. The stock bridge replies
+    to GOTO cancel after executing it on Unity's main thread; require that acknowledgement.
+    A missing acknowledgement keeps the slot occupied for retry on the next tick.
+    """
+    task.stop_reason, task.stop_origin, task.stop_state = reason, origin, state
+    rec.record({"type": "HARNESS_DECISION", "origin": origin, "action_id": None,
+                "command": "GOTO", "args": "cancel", "dry_run": False,
+                "cancelled_task": task.label, "reason": reason})
+    reply = p.command("GOTO", "cancel")
+    ok = bool(reply and reply.get("type") == "COMMAND_RESPONSE"
+              and reply.get("command") == "GOTO" and reply.get("status") == "ok")
+    rec.record({"type": "HARNESS_NOTE", "note": "task_stop", "label": task.label,
+                "reason": reason, "acknowledged": ok})
+    return ok
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="JEV drives the character")
     ap.add_argument("--run-id", default=time.strftime("jev-%Y%m%d-%H%M%S"))
-    ap.add_argument("--minutes", type=float, default=15.0)
+    ap.add_argument("--minutes", type=float, default=15.0,
+                    help="0 = no limit: record until Ctrl+C or the connection drops "
+                         "(for a full run, however long it lasts)")
     # Measured over 578 calls: JEV answers in 505 ms median, 720 ms p99, and a tick costs
     # ~0.7 s including the query sweep -- so 1 s keeps up, and a redirect (two ticks) reacts in
     # 2 s instead of 4. 60 req/min against a 1,200 limit, ~$0.43/hour.
@@ -137,6 +163,7 @@ def main() -> int:
         print(f"  !! EnableAIControl = false in {cfg}. Close the game, set it true, retry.")
         return 2
     print(f"run id   : {a.run_id}   decide every {a.decide_every:g}s   "
+          f"{'no time limit (Ctrl+C to stop)' if a.minutes <= 0 else f'{a.minutes:g} min'}   "
           f"{'DRY RUN (nothing sent)' if a.dry_run else 'LIVE'}")
     print(">>> Now launch the game and start a run. Leave this window alone.")
     print()
@@ -172,7 +199,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     life = Lifecycle()
     task: Task | None = None
     seen_events = len(p.events)
-    t_end = time.monotonic() + a.minutes * 60
+    # A whole run has no known length -- 0 means record until Ctrl+C or the link drops.
+    t_end = time.monotonic() + a.minutes * 60 if a.minutes > 0 else None
     t_next = 0.0
     backoff_until = 0.0
     last_setting: dict[str, str] = {}
@@ -185,8 +213,9 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     quarantined: dict[str, float] = {}
     refused: dict[str, float] = {}
     declined: dict[str, int] = {}
+    scene = None
 
-    while not stop["flag"] and not p.lost and time.monotonic() < t_end:
+    while not stop["flag"] and not p.lost and (t_end is None or time.monotonic() < t_end):
         now = time.monotonic()
         if now < t_next:
             # jev-06: a task ending mid-wait used to be noticed only at the next tick, after the
@@ -201,6 +230,13 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         t_next = now + a.decide_every
         got = poll(p, st)
         obs = got.get("QUERY_OBSERVATION")
+        if st.in_game and st.scene_name != scene:
+            # Instance IDs and the singleton teleporter refer to this scene only.
+            scene = st.scene_name
+            quarantined.clear()
+            refused.clear()
+            declined.clear()
+            redirect = {"to": None, "n": 0}
         if obs and not build_checked["done"]:
             build_checked["done"] = True
             running = obs.get("mod_build")
@@ -209,7 +245,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             if running != EXPECTED_MOD_BUILD:
                 print(f"  !! The game is running fork build {running or '<16 or older>'}, not "
                       f"{EXPECTED_MOD_BUILD}. Close the game, `python tools/deploy.py`, and")
-                print("     START IT AGAIN -- the DLL is loaded at startup (jev-14..16 ran stale).")
+                print("     START IT AGAIN -- the DLL is loaded at startup.")
 
         # --- task bookkeeping: events, then the fallbacks F25 makes necessary -----------
         for ev in p.events[seen_events:]:
@@ -234,7 +270,11 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                     d = it.get("distance")
             if d is not None and (task.best_m is None or d < task.best_m - STUCK_PROGRESS_M):
                 task.best_m, task.best_at = d, now
-            if task.target_iid and ids is not None and task.target_iid not in ids:
+            if task.stop_reason is not None:
+                why, state = task.stop_reason, task.stop_state
+            elif st.scene_name != task.scene:
+                why, state = "scene changed", State.COMPLETED
+            elif task.target_iid and ids is not None and task.target_iid not in ids:
                 why, state = "target no longer available (used)", State.COMPLETED
             elif st.objective != task.objective:
                 # F37: starting the teleporter sends no terminal event, so jev-01 held the slot
@@ -248,6 +288,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             elif now - task.since > task.timeout_s:
                 why, state = f"no outcome within {task.timeout_s:g}s", State.FAILED
             if why:
+                if not stop_task(p, rec, task, origin=task.stop_origin, reason=why, state=state):
+                    continue
                 life.on_event(task.command_id, state, why)
                 rec.record({"type": "HARNESS_NOTE", "note": "task_released",
                             "label": task.label, "why": why})
@@ -275,6 +317,10 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                                     if st.stage_started_at is not None else None))
         ad.raw["t_capture_mono_ms"] = int(now * 1000)
         active = life.has_active_task()
+        if active and task:
+            ad.banded["control"]["active_action"] = {
+                "id": life.task.action_id, "what": task.description,
+            }
         reg = build_registry(ad.raw, set(caps), active)
         refused = {k: v for k, v in refused.items() if v > now}
         for aid in list(reg):
@@ -323,10 +369,13 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         p_pick = float((sel0.get("probabilities") or {}).get(pick, 0.0))
         other = (task is not None and task.label.startswith("GOTO_ID:") and life.task is not None
                  and pick in reg and pick != life.task.action_id
-                 and pick.split(":")[0] not in ("fight_nearby", "explore")
-                 and p_pick >= REDIRECT_MIN_P)
+                 and p_pick >= REDIRECT_MIN_P
+                 and _gates_satisfied(reg[pick], res.answers, sel0, []))
         redirect = ({"to": pick, "n": redirect["n"] + 1} if other else {"to": None, "n": 0})
         if redirect["n"] >= REDIRECT_TICKS:
+            if not stop_task(p, rec, task, origin=f"jev:next_action:{ad.raw['observation_id']}",
+                             reason=f"redirected to {pick}", state=State.CANCELLED):
+                continue
             rec.record({"type": "HARNESS_NOTE", "note": "task_redirected", "from": task.label,
                         "to": pick, "p": round(p_pick, 2)})
             life.on_event(task.command_id, State.CANCELLED, f"redirected to {pick}")
@@ -374,7 +423,9 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                     iid = (mc.args if mc.command in ("INTERACT_ID", "GOTO_ID")
                            and mc.args != "teleporter" else None)
                     task = Task(cmd.command_id, mc.label, iid, now, st.objective,
-                                TASK_TIMEOUT_S.get(mc.command, TASK_TIMEOUT_DEFAULT_S))
+                                TASK_TIMEOUT_S.get(mc.command, TASK_TIMEOUT_DEFAULT_S),
+                                req.questions["next_action"]["criteria"][cmd.action_id]["what"],
+                                st.scene_name)
                 else:
                     # A standing MODE, or a dry run: nothing will end it, so free the slot now
                     # and let JEV re-decide next tick.
