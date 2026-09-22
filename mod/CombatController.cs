@@ -502,7 +502,56 @@ namespace Rainflayer
         /// </summary>
         private static bool GroundBelow(Vector3 point)
         {
-            return Physics.Raycast(point + Vector3.up * 4f, Vector3.down, 7f, LayerMask.GetMask("World"));
+            return DropBelow(point, EDGE_MAX_DROP_M) <= EDGE_MAX_DROP_M;
+        }
+
+        /// <summary>A drop to ground this deep or less is walked; deeper, or none, is an edge.
+        /// Build 5's 3 m trapped the character on a dome (fork-10): every side fell away faster
+        /// than that, so every heading read as a cliff.</summary>
+        private const float EDGE_MAX_DROP_M = 8f;
+
+        /// <summary>Blocked in every direction this long, take the shortest drop anyway.</summary>
+        private const float EDGE_ESCAPE_AFTER_S = 2f;
+
+        /// <summary>The escape only takes a heading with ground within this depth.</summary>
+        private const float EDGE_ESCAPE_MAX_DROP_M = 50f;
+
+        private float edgeBlockedFor;
+
+        /// <summary>Depth from <paramref name="point"/>'s height down to ground, searching
+        /// <paramref name="search"/> m; +infinity if there is none. The ray starts 4 m above so
+        /// rising ground (stairs, rims) is found too.</summary>
+        private static float DropBelow(Vector3 point, float search)
+        {
+            RaycastHit hit;
+            if (Physics.Raycast(point + Vector3.up * 4f, Vector3.down, out hit, search + 4f,
+                                LayerMask.GetMask("World")))
+                return point.y - hit.point.y;
+            return float.PositiveInfinity;
+        }
+
+        /// <summary>
+        /// Called every frame the character is held still by an edge. After EDGE_ESCAPE_AFTER_S,
+        /// returns the heading (of 8) whose ground EDGE_WALK_PROBE_M ahead is the shortest drop
+        /// within EDGE_ESCAPE_MAX_DROP_M; zero if there is none (a real void on every side).
+        /// </summary>
+        private Vector3 EdgeEscape(CharacterBody body)
+        {
+            edgeBlockedFor += Time.deltaTime;
+            if (edgeBlockedFor < EDGE_ESCAPE_AFTER_S)
+                return Vector3.zero;
+            Vector3 pos = body.transform.position;
+            Vector3 best = Vector3.zero;
+            float bestDrop = EDGE_ESCAPE_MAX_DROP_M;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 dir = Quaternion.AngleAxis(i * 45f, Vector3.up) * Vector3.forward;
+                float drop = DropBelow(pos + dir * EDGE_WALK_PROBE_M, EDGE_ESCAPE_MAX_DROP_M);
+                if (drop <= bestDrop) { bestDrop = drop; best = dir; }
+            }
+            if (best != Vector3.zero)
+                EdgeLog($"[EDGE] blocked {edgeBlockedFor:F1}s on every side; escaping over a {bestDrop:F1} m drop");
+            return best;
         }
 
         /// <summary>
@@ -516,7 +565,10 @@ namespace Rainflayer
                 return move;
             Vector3 pos = body.transform.position;
             if (GroundAlong(pos, move, EDGE_WALK_PROBE_M))
+            {
+                edgeBlockedFor = 0f;
                 return move;
+            }
 
             float speed = move.magnitude;
             Vector3 flat = new Vector3(move.x, 0f, move.z);
@@ -525,12 +577,13 @@ namespace Rainflayer
                 Vector3 alt = Quaternion.AngleAxis(deg, Vector3.up) * flat;
                 if (GroundAlong(pos, alt, EDGE_WALK_PROBE_M))
                 {
+                    edgeBlockedFor = 0f;
                     EdgeLog($"[EDGE] combat move blocked by an edge; detour {deg:+0;-0}°");
                     return alt.normalized * speed;
                 }
             }
             EdgeLog("[EDGE] combat move blocked by an edge in every direction; holding still");
-            return Vector3.zero;
+            return EdgeEscape(body) * speed;
         }
 
         private void EdgeLog(string msg)
@@ -902,7 +955,8 @@ namespace Rainflayer
                 // saves and restores inputBank.moveVector every frame, so a branch that sets no
                 // movement leaves last frame's "walk toward the edge" in force -- the character
                 // detected the cliff and kept walking off it.
-                body.inputBank.moveVector = Vector3.zero;
+                // ROR-JEV (fork-10): ...unless it has been cornered for a while, as on a dome.
+                body.inputBank.moveVector = EdgeEscape(body);
 
                 // ROR-JEV fix 2 (edge loop): exploration scoring prefers unvisited positions,
                 // and a waypoint beyond an edge can never be visited, so it stayed the most
@@ -919,6 +973,7 @@ namespace Rainflayer
             }
             else if (distanceToWaypoint > 1f)
             {
+                edgeBlockedFor = 0f;
                 // Apply jump detection to navigate over obstacles
                 Vector3 moveDirection = controller.GetNavigationController().ApplyJumpDetection(body, directionToWaypoint.normalized);
 

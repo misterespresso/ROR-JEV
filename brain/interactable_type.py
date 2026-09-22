@@ -40,6 +40,7 @@ RULES: list[tuple[str, str]] = [
     (r"Duplicator(Large|Military|Wild)?$", "printer"),
     (r"MultiShop(Large|Equipment)?Terminal", "shop_terminal"),
     (r"Scrapper", "scrapper"),
+    (r"NewtStatue", "newt_altar"),                  # lunar coin; opens the Bazaar portal
 ]
 
 _COMPILED = [(re.compile(p), t) for p, t in RULES]
@@ -55,8 +56,21 @@ REGISTRY_TYPE: dict[str, str] = {
 }
 
 
+#: Scene-placed copies carry Unity's " (1)" numbering (fork-10: `NewtStatue (1)`).
+_NUMBERED = re.compile(r"\s*\(\d+\)$")
+
+
 def classify(prefab: str) -> str | None:
+    name = _NUMBERED.sub("", prefab or "")
     for rx, t in _COMPILED:
-        if rx.match(prefab or ""):
+        if rx.match(name):
             return t
     return None
+
+
+def shop_item_name(raw: str | None) -> str | None:
+    """The item table's name for a shop/printer item. `PickupDef.internalName` is prefixed
+    (`ItemIndex.BossDamageBonus`, fork-10); the inventory sends the bare name."""
+    if not raw:
+        return None
+    return raw.split(".", 1)[1] if raw.startswith(("ItemIndex.", "EquipmentIndex.")) else raw

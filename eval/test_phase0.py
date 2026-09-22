@@ -717,6 +717,12 @@ def trace_full_interactables():
           and ctype("MultiShopTerminal") == "shop_terminal")
     check("Chest1 is not Chest2", ctype("Chest1") == "chest_small" and ctype("Chest2") == "chest_large")
     check("unknown prefab stays unclassified", ctype("SomethingNew") is None)
+    check("Unity's numbered copies match (fork-10)", ctype("NewtStatue (1)") == "newt_altar")
+    from brain.interactable_type import shop_item_name
+    from brain.build_identity import ITEMS as ITEM_TABLE
+    check("shop item prefix is stripped to the item table's name (fork-10)",
+          shop_item_name("ItemIndex.BossDamageBonus") == "BossDamageBonus"
+          and "BossDamageBonus" in ITEM_TABLE)
     check("every registry type is a table type",
           set(REGISTRY_TYPE) <= {t for _, t in RULES})
 
