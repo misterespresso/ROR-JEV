@@ -705,6 +705,61 @@ def trace_threat_block():
     check("every table row uses a known class", set(BODIES.values()) <= set(CLASSES))
 
 
+def trace_full_interactables():
+    print("\nBuild 6: the mod's full-stage interactables replace stock's cone; IDs are stable")
+    from brain.interactable_type import REGISTRY_TYPE, RULES, classify as ctype
+
+    check("stage variants match their stem", ctype("ShrineChanceSandy") == "shrine_chance"
+          and ctype("ShrineBloodSnowy") == "shrine_blood")
+    check("a money barrel is a barrel, an equipment barrel is not",
+          ctype("Barrel1") == "barrel" and ctype("EquipmentBarrel") == "equipment_barrel")
+    check("printers and terminals by prefab", ctype("DuplicatorLarge") == "printer"
+          and ctype("MultiShopTerminal") == "shop_terminal")
+    check("Chest1 is not Chest2", ctype("Chest1") == "chest_small" and ctype("Chest2") == "chest_large")
+    check("unknown prefab stays unclassified", ctype("SomethingNew") is None)
+    check("every registry type is a table type",
+          set(REGISTRY_TYPE) <= {t for _, t in RULES})
+
+    def item(i, prefab, dist, cost=25, ct="Money", **kw):
+        d = {"id": i, "kind": "purchase", "prefab": prefab, "display": prefab, "cost": cost,
+             "cost_type": ct, "distance": dist, "height": 0.0}
+        d.update(kw)
+        return d
+
+    o = _obs()
+    o["interactables"] = {"total": 5, "unavailable": 2, "listed": 5, "items": [
+        item(111, "Chest1", 3.0),
+        item(222, "Barrel1", 8.0, cost=0, ct="None", kind="barrel"),
+        item(333, "Drone1Broken", 20.0, cost=40),
+        item(444, "MultiShopTerminal", 30.0, shop_hidden=False, shop_item="Crowbar"),
+        item(555, "MysteryThing", 40.0),
+    ]}
+    stock_ix = {"interactables": [
+        {"type": "chest", "name": "Basic Chest", "cost": 25, "distance": 90.0},
+        {"type": "teleporter", "name": "Teleporter", "distance": 120.0, "charged": False}]}
+    stock = ({"objective": "exploring", "boss_active": False, "scene_name": "golemplains"},
+             {"money": 100, "items": []}, {"enemy_count": 0, "nearest_enemy_distance": 999.0},
+             stock_ix)
+    ad = adapt(*stock, observation_id="o", seq=1, observation=o)
+    ids = [i["entity_id"] for i in ad.raw["interactables"]]
+    check("stock's cone chest is replaced; its teleporter is kept",
+          any(i.startswith("teleporter") for i in ids) and "chest-0" not in ids, str(ids))
+    check("the chest carries the game's instance ID", "chest_small-111" in ids, str(ids))
+    check("barrel, drone and terminal are visible but not offered",
+          sorted(ad.visible_no_verb) == ["barrel", "drone", "shop_terminal"],
+          str(ad.visible_no_verb))
+    check("the unknown prefab is reported, not guessed", ad.unmapped == ["prefab:MysteryThing"])
+
+    reg = build_registry(ad.raw, set(CAPS), False)
+    check("the in-range chest is offerable under its stable ID",
+          any(k.startswith("open_chest") and "111" in k for k in reg), str(sorted(reg)))
+
+    ad2 = adapt(*stock, observation_id="o", seq=2, observation=_obs())
+    check("without the block, stock's list is used unchanged",
+          [i["entity_id"] for i in ad2.raw["interactables"]] == ["chest-0", "teleporter-1"],
+          str([i["entity_id"] for i in ad2.raw["interactables"]]))
+
+
 def trace_adapter_on_real_recording():
     print("\nReplay: real recorded frames through the real registry")
     rec = Path(__file__).resolve().parents[1] / "recordings" / "human-01"
@@ -752,6 +807,7 @@ TRACES = [
     trace_adapter_refuses_to_invent, trace_string_coercion,
     trace_adapter_reads_observation, trace_replay_pairs_observations,
     trace_dead_asks_nothing, trace_build_identity, trace_threat_block,
+    trace_full_interactables,
     trace_adapter_on_real_recording,
 ]
 

@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
 from .enemy_class import band_threat
+from .interactable_type import REGISTRY_TYPE, classify as classify_prefab
 
 #: Every place this adapter is making something up rather than reading it. Kept as data so
 #: a replay report can print it, because a reader who does not know these is being misled.
@@ -45,6 +46,9 @@ ADAPTER_ASSUMPTIONS = [
     "enemy classes and being_focused are banded from build 4's threat block by a provisional "
     "table (brain/enemy_class.py); raw threat.enemies stays empty -- the mod sends no "
     "entity IDs, so fight_boss cannot target them (F17)",
+    "build 6+: interactables come from the mod's full-stage list with stable instance IDs; "
+    "types come from a provisional prefab table (brain/interactable_type.py); `locked` is not "
+    "reported there and is assumed false",
     "build.identity is derived from items by a provisional table (brain/build_identity.py)",
     "time_band and hp_band thresholds are provisional (TIME_BANDS_MIN, HP_BANDS); no doc "
     "defines them",
@@ -151,6 +155,11 @@ def from_observation(obs: dict | None) -> dict | None:
     }
 
 
+#: The mod's CostTypeIndex names -> the registry's cost types.
+COST_TYPES = {"Money": "gold", "LunarCoin": "lunar_coin", "PercentHealth": "health",
+              "None": "none"}
+
+
 #: stock `objective` -> our `objective.phase`
 PHASE_MAP = {
     "exploring": "pre_teleporter",
@@ -241,6 +250,8 @@ class Adapted:
     banded: dict = field(default_factory=dict)   # what would go to JEV
     unmapped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    #: Build 6+: classified interactables the registry has no verb for yet (barrel, drone...).
+    visible_no_verb: list[str] = field(default_factory=list)
 
 
 def _gold_band(gold: int | None) -> str:
@@ -318,6 +329,40 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                       "cost_band": "cheap" if (num(it.get("cost"), 0) or 0) <= 25
                       else "expensive",
                       "distance_band": _nearest_band(dist), "reachable": True})
+
+    # Build 6+: the mod's full-stage list replaces stock's camera cone (F12) for everything but
+    # the teleporter, which it does not include. IDs are the game's instance IDs: stable.
+    block = (observation or {}).get("interactables") if (observation or {}).get("in_run") else None
+    if isinstance(block, dict) and isinstance(block.get("items"), list):
+        keep = [i for i, it in enumerate(ilist) if it["type"].startswith("teleporter")]
+        ilist = [ilist[i] for i in keep]
+        cands = [cands[i] for i in keep]
+        out.unmapped = []
+        for it in block["items"]:
+            t = classify_prefab(str(it.get("prefab") or ""))
+            if t is None:
+                out.unmapped.append(f"prefab:{it.get('prefab')}")
+                continue
+            rtype = REGISTRY_TYPE.get(t)
+            if rtype is None:
+                out.visible_no_verb.append(t)
+                continue
+            dist = num(it.get("distance"), 1e9)
+            eid = f"{t}-{it.get('id')}"
+            in_range = dist is not None and dist <= range_m
+            cost = num(it.get("cost"), 0)
+            ilist.append({
+                "entity_id": eid, "type": rtype, "display_name": it.get("display"),
+                "cost": cost, "cost_type": COST_TYPES.get(str(it.get("cost_type")),
+                                                        str(it.get("cost_type")).lower()),
+                "locked": False, "distance": dist, "in_interaction_range": in_range,
+                # Stable ID, so the token names one object -- but the mod still issues none.
+                "opportunity_token": f"synthetic-{eid}" if in_range else None,
+                "path_reachable": True, "reachability_age_ms": UNKNOWN,
+            })
+            cands.append({"id": eid, "type": rtype,
+                          "cost_band": "cheap" if (cost or 0) <= 25 else "expensive",
+                          "distance_band": _nearest_band(dist), "reachable": True})
 
     out.raw = {
         "type": "OBSERVATION", "observation_id": observation_id, "seq": seq,

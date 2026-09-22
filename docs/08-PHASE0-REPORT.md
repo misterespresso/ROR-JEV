@@ -1171,6 +1171,11 @@ nearest), asked as a question, with today's score as the default; and (2) item e
 state that JEV can read -- a one-line effect per item from the identity table would do.
 After build 6 (visibility).
 
+The person running the project frames the wider need as micro-tactics: the goal should change
+every few seconds as the fight changes. That is the per-tick design already -- one fan-out call
+per tick -- so a `target_priority` question is re-asked every tick like the others; nothing
+needs to hold a target once JEV stops choosing it.
+
 ---
 
 ## §4 Pinned build (step 3)

@@ -38,6 +38,16 @@ namespace Rainflayer
         /// <summary>At most this many enemies are listed (nearest first); the counts cover all of them.</summary>
         const int THREAT_LIST_MAX = 16;
 
+        /// <summary>At most this many interactables are listed (nearest first); `total` counts all.</summary>
+        const int INTERACTABLE_LIST_MAX = 48;
+
+        /// <summary>Refresh the interactable object lists this often; state is re-read every snapshot.</summary>
+        const float INTERACTABLE_CACHE_S = 2f;
+
+        static PurchaseInteraction[] purchaseCache = new PurchaseInteraction[0];
+        static BarrelInteraction[] barrelCache = new BarrelInteraction[0];
+        static float interactableCacheAt = -999f;
+
         /// <summary>FindObjectsOfType is too expensive per snapshot; refresh the fog list this often.</summary>
         const float FOG_CACHE_S = 5f;
 
@@ -117,6 +127,7 @@ namespace Rainflayer
             top.Add(P("self", "{" + string.Join(",", selfFields) + "}"));
             top.Add(P("hazards", "{" + string.Join(",", hazardFields) + "}"));
             top.Add(P("threat", Threat(body)));
+            top.Add(P("interactables", Interactables(body)));
             return "{" + string.Join(",", top) + "}";
         }
 
@@ -179,6 +190,98 @@ namespace Rainflayer
                 P("listed", list.Count.ToString(CultureInfo.InvariantCulture)),
                 P("enemies", "[" + string.Join(",", list) + "]"),
             }) + "}";
+        }
+
+        /// <summary>
+        /// Every purchasable object and every barrel on the stage (build 6, F12): no view cone, no
+        /// line-of-sight test, no name filter. Stock's QUERY_INTERACTABLES keeps only names with
+        /// "shrine" or "chest" inside a 180-degree cone, and never sees barrels at all -- they are
+        /// BarrelInteraction, not PurchaseInteraction. Raw facts only; the brain names the types.
+        ///
+        /// `id` is the Unity instance ID: stable for the object's life within a stage, so the brain
+        /// can track one chest across observations (F17). Only available objects are listed.
+        /// </summary>
+        static string Interactables(CharacterBody body)
+        {
+            float now = Time.realtimeSinceStartup;
+            if (now - interactableCacheAt > INTERACTABLE_CACHE_S)
+            {
+                purchaseCache = UnityEngine.Object.FindObjectsOfType<PurchaseInteraction>();
+                barrelCache = UnityEngine.Object.FindObjectsOfType<BarrelInteraction>();
+                interactableCacheAt = now;
+            }
+
+            Vector3 me = body.corePosition;
+            var found = new List<KeyValuePair<float, string>>();
+            int unavailable = 0;
+
+            foreach (var pi in purchaseCache)
+            {
+                if (pi == null) continue;
+                if (!pi.available) { unavailable++; continue; }
+                Vector3 pos = pi.transform.position;
+                float d = Vector3.Distance(me, pos);
+                var fields = new List<string>
+                {
+                    P("id", pi.gameObject.GetInstanceID().ToString(CultureInfo.InvariantCulture)),
+                    P("kind", S("purchase")),
+                    P("prefab", S(Prefab(pi.gameObject))),
+                    P("display", S(pi.GetDisplayName() ?? "")),
+                    P("cost", pi.cost.ToString(CultureInfo.InvariantCulture)),
+                    P("cost_type", S(pi.costType.ToString())),
+                    P("distance", F(d)),
+                    P("height", F(pos.y - me.y)),
+                };
+                var shop = pi.GetComponent<ShopTerminalBehavior>();
+                if (shop != null)
+                {
+                    bool hidden = shop.pickupIndexIsHidden;
+                    var def = hidden ? null : PickupCatalog.GetPickupDef(shop.CurrentPickupIndex());
+                    fields.Add(P("shop_hidden", B(hidden)));
+                    fields.Add(P("shop_item", def != null ? S(def.internalName ?? "") : "null"));
+                }
+                found.Add(new KeyValuePair<float, string>(d, "{" + string.Join(",", fields) + "}"));
+            }
+
+            foreach (var bi in barrelCache)
+            {
+                if (bi == null) continue;
+                if (bi.Networkopened) { unavailable++; continue; }
+                Vector3 pos = bi.transform.position;
+                float d = Vector3.Distance(me, pos);
+                found.Add(new KeyValuePair<float, string>(d, "{" + string.Join(",", new[]
+                {
+                    P("id", bi.gameObject.GetInstanceID().ToString(CultureInfo.InvariantCulture)),
+                    P("kind", S("barrel")),
+                    P("prefab", S(Prefab(bi.gameObject))),
+                    P("display", S(bi.GetDisplayName() ?? "")),
+                    P("cost", "0"),
+                    P("cost_type", S("None")),
+                    P("distance", F(d)),
+                    P("height", F(pos.y - me.y)),
+                }) + "}"));
+            }
+
+            found.Sort((x, y) => x.Key.CompareTo(y.Key));
+            var list = new List<string>();
+            for (int i = 0; i < found.Count && i < INTERACTABLE_LIST_MAX; i++)
+                list.Add(found[i].Value);
+
+            return "{" + string.Join(",", new[]
+            {
+                P("total", found.Count.ToString(CultureInfo.InvariantCulture)),
+                P("unavailable", unavailable.ToString(CultureInfo.InvariantCulture)),
+                P("listed", list.Count.ToString(CultureInfo.InvariantCulture)),
+                P("items", "[" + string.Join(",", list) + "]"),
+            }) + "}";
+        }
+
+        /// <summary>The prefab name: the GameObject name without Unity's "(Clone)" suffix.</summary>
+        static string Prefab(GameObject go)
+        {
+            string n = go.name ?? "";
+            int i = n.IndexOf("(Clone)", StringComparison.Ordinal);
+            return (i >= 0 ? n.Substring(0, i) : n).Trim();
         }
 
         /// <summary>True if any of the body's AIs has the player as its current enemy.</summary>

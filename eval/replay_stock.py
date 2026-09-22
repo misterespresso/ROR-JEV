@@ -153,6 +153,7 @@ def main() -> int:
     errors: list[str] = []
     verbs_offered = Counter()
     with_obs = 0
+    visible_no_verb = Counter()
 
     for tick in ticks(frames):
         n += 1
@@ -166,6 +167,8 @@ def main() -> int:
             with_obs += 1
         for u in ad.unmapped:
             unmapped[u] += 1
+        for v in set(ad.visible_no_verb):
+            visible_no_verb[v] += 1
         phases[ad.banded["objective"]["phase"]] += 1
 
         try:
@@ -210,6 +213,12 @@ def main() -> int:
         print("unmapped stock interactable types (no verb, so never offered):")
         for u, c in unmapped.most_common():
             print(f"    {u:<20} {c:5d} sightings")
+        print()
+
+    if visible_no_verb:
+        print("visible (build 6+) but no verb yet -- JEV cannot be offered these:")
+        for v, c in visible_no_verb.most_common():
+            print(f"    {v:<20} {c:5d} ticks")
         print()
 
     print("-" * 78)
