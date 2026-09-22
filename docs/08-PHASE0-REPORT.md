@@ -1517,6 +1517,12 @@ carry build 17's `unseen` field: the game had been launched before those deploys
 loads the DLL at startup. `tools/deploy.py` only warns that the game must be CLOSED to deploy --
 it cannot know whether the session that comes back was started afterwards.
 
+**Correction (same session, jev-17):** the evidence above is not evidence. No build ever emitted
+`unseen` -- the build-17 edit that added it to the output never landed, though the filtering did
+-- so its absence in jev-14..16 proves nothing about which DLL they ran. The restart rule is real
+(BepInEx loads the DLL at startup) and `mod_build` now makes it checkable: jev-17 reported
+`running: 18, expected: 18`. Treat the claim that those three runs ran stale as **unproven**.
+
 Build 18 reports `mod_build` in every snapshot; `eval/jev_run.py` compares it with
 `EXPECTED_MOD_BUILD` on the first frame, records it, and prints a loud warning. **Deploying is
 not enough: the game must be restarted afterwards.**

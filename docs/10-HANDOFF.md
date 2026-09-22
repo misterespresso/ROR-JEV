@@ -1,5 +1,9 @@
 # Handoff — 2026-09-21
 
+> **Superseded in part by `11-HANDOFF-2.md` (2026-09-22).** That session took the project from
+> "the brain has never decided anything" to JEV playing the game (builds 3-18, findings F31-F58,
+> `eval/jev_run.py`). Read handoff 2 first; this file remains the Phase 0 record.
+
 Read this first. It is the state of the project at the end of the session that executed Phase 0
 and started the fork, written so the next session does not re-derive any of it. Details live in
 `08-PHASE0-REPORT.md` (findings F1–F30) and `09-FORK-BASE.md` (the fork, builds 0–2).

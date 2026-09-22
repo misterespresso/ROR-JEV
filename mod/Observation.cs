@@ -326,6 +326,7 @@ namespace Rainflayer
             {
                 P("total", found.Count.ToString(CultureInfo.InvariantCulture)),
                 P("unavailable", unavailable.ToString(CultureInfo.InvariantCulture)),
+                P("unseen", unseen.ToString(CultureInfo.InvariantCulture)),
                 P("listed", list.Count.ToString(CultureInfo.InvariantCulture)),
                 P("items", "[" + string.Join(",", list) + "]"),
             }) + "}";
