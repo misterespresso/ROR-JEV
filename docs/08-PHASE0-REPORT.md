@@ -178,6 +178,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F49 | **No run ever left stage 1**: nothing in state said how long the stage had taken, what was left, or that difficulty climbs | **fixed** — `run.stage_time_band`, `run.difficulty_band`, `objective.affordable_left_here`, primer and worth-gate text |
 | F50 | **The character never shot while travelling**: it walked into enemies and took the hits | **fixed in build 16** — aim and fire while the pathfinder steers |
 | F51 | **Broke at stage start read as "stage finished"**, so JEV went straight for the teleporter | **fixed** — `objective.unopened_left_here` separate from what is affordable |
+| F54 | **Walked to a drone six times and never repaired it**: the option said nothing about what the drone does, and argued against itself | **fixed** — a kind per drone with what it does; neutral text; walks to a repeatedly-declined target withheld |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1460,6 +1461,26 @@ Measured over 578 calls: JEV answers in **505 ms median, 619 p90, 720 p99, 805 m
 ~0.7 s including the query sweep; requests are ~2,856 input tokens. The default moves from 2 s to
 **1 s**: 60 requests a minute against a 1,200/min limit, ~$0.43/hour, and a redirect (two ticks)
 now reacts in 2 s instead of 4. Below 1 s the p99 answer would not land before the next tick.
+
+
+### F54 — "It couldn't pick up the healing drone"
+
+jev-14: the character walked to a broken healing drone six times. In range, `repair_drone` **was**
+offered every time and JEV chose `explore` or `fight_nearby` instead (0.43-0.60); out of range it
+chose the walk at 0.86-0.95. So it wanted to go, and refused to buy.
+
+Both causes were in the option text I wrote. All drones shared one kind, "broken drone", so a
+healing drone -- worth as much as an item on Drizzle -- read as generic; and the text said
+"Spends gold that a chest could have used", with a `not_for` about needing the gold for a chest,
+arguing against the action inside its own description. Now each drone is its own kind with what it
+does ("broken healing drone (heals the character)"), and the text is factual.
+
+Re-asked on jev-14's own ticks, the ones where it declined: **repair_drone 0.63-0.77**, above the
+0.50 a costly action needs, where it had been `explore`.
+
+Second, structural: after `DECLINE_LIMIT` (3) ticks of passing over an action it is in range of,
+walking back to that object is withheld for 60 s. Whatever JEV prefers, the arrive-decline-drift-
+return cycle ends.
 
 ---
 

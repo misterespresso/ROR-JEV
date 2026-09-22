@@ -41,8 +41,15 @@ RULES: list[tuple[str, str]] = [
     (r"ShrineRestack", "shrine_order"),
     (r"ShrineGoldshoresAccess", "shrine_gold"),
     (r"ShrineCleanse", "cleansing_pool"),
-    (r"(Drone1|Drone2|MissileDrone|EquipmentDrone|FlameDrone|MegaDrone|EmergencyDrone)Broken",
-     "drone"),
+    # jev-14: one "drone" kind said nothing about what it does, so a healing drone read as
+    # "broken drone, costs gold" and JEV declined it at the drone, six times.
+    (r"Drone1Broken", "drone_gunner"),
+    (r"Drone2Broken", "drone_healing"),
+    (r"MissileDroneBroken", "drone_missile"),
+    (r"FlameDroneBroken", "drone_incinerator"),
+    (r"EquipmentDroneBroken", "drone_equipment"),
+    (r"MegaDroneBroken", "drone_tc280"),
+    (r"EmergencyDroneBroken", "drone_emergency"),
     (r"Turret1Broken", "turret"),
     (r"Duplicator(Large|Military|Wild)?$", "printer"),
     (r"MultiShop(Large|Equipment)?Terminal", "shop_terminal"),
@@ -64,7 +71,15 @@ LABELS: dict[str, str] = {
     "chest_utility_large": "large utility chest (always an uncommon utility item)",
     "chest_adaptive": "adaptive chest", "shrine_chance": "Shrine of Chance",
     "shrine_blood": "Shrine of Blood", "barrel": "barrel", "drone": "broken drone",
-    "turret": "broken turret", "printer": "printer", "shop_terminal": "shop terminal",
+    "drone_gunner": "broken gunner drone (shoots enemies)",
+    "drone_healing": "broken healing drone (heals the character)",
+    "drone_missile": "broken missile drone (fires missiles at enemies)",
+    "drone_incinerator": "broken incinerator drone (burns enemies)",
+    "drone_equipment": "broken equipment drone (uses a carried equipment for you)",
+    "drone_tc280": "broken TC-280 prototype (a powerful heavy drone)",
+    "drone_emergency": "broken emergency drone (revives and heals)",
+    "turret": "broken turret (a stationary gun that stays where it is built)",
+    "printer": "printer", "shop_terminal": "shop terminal",
     "lunar_pod": "lunar pod", "newt_altar": "newt altar",
 }
 
@@ -86,7 +101,9 @@ REGISTRY_TYPE: dict[str, str] = {
     "barrel": "barrel",
     "equipment_barrel": "equipment_barrel",
     "shop_terminal": "shop_terminal",
-    "drone": "drone",
+    "drone_gunner": "drone", "drone_healing": "drone", "drone_missile": "drone",
+    "drone_incinerator": "drone", "drone_equipment": "drone", "drone_tc280": "drone",
+    "drone_emergency": "drone",
     "turret": "drone",
 }
 

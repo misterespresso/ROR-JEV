@@ -71,6 +71,11 @@ QUARANTINE_S = 60.0
 #: The refusal stands; JEV simply is not asked the same unanswerable question every 2 s.
 REFUSED_SUPPRESS_S = 30.0
 
+#: jev-14: JEV walked to a drone at 0.86-0.95, was offered the repair while standing at it, chose
+#: something else, drifted off, and walked back -- six times. After this many ticks of declining
+#: an action it is in range of, walking back to that object is withheld for QUARANTINE_S.
+DECLINE_LIMIT = 3
+
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
 
@@ -170,6 +175,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     redirect = {"to": None, "n": 0}
     quarantined: dict[str, float] = {}
     refused: dict[str, float] = {}
+    declined: dict[str, int] = {}
 
     while not stop["flag"] and not p.lost and time.monotonic() < t_end:
         now = time.monotonic()
@@ -277,9 +283,25 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                     "omitted": req.omitted, "answers": res.answers, "usage": res.usage,
                     "latency_ms": round(res.latency_ms, 1)})
 
-        # --- redirect a walk JEV no longer wants (jev-06) ---------------------------------
+        # --- offered in range and passed over, repeatedly? (jev-14) -----------------------
         sel0 = res.answers.get("next_action") or {}
         pick = str(sel0.get("choice") or "")
+        for aid, rec_ in reg.items():
+            eid = rec_.args.get("target_id")
+            if not eid or rec_.verb == "navigate" or aid == pick:
+                continue
+            declined[aid] = declined.get(aid, 0) + 1
+            if declined[aid] >= DECLINE_LIMIT:
+                # It keeps choosing not to, standing right there. Stop walking back to it.
+                iid = eid.split("@")[-1]
+                quarantined[iid] = now + QUARANTINE_S
+                declined[aid] = 0
+                rec.record({"type": "HARNESS_NOTE", "note": "declined_in_range",
+                            "action": aid, "for_s": QUARANTINE_S})
+        if pick in declined:
+            declined[pick] = 0
+
+        # --- redirect a walk JEV no longer wants (jev-06) ---------------------------------
         p_pick = float((sel0.get("probabilities") or {}).get(pick, 0.0))
         other = (task is not None and task.label.startswith("GOTO_ID:") and life.task is not None
                  and pick in reg and pick != life.task.action_id

@@ -243,8 +243,8 @@ payload:
         what: "Buy {item} from the shop terminal you are standing at ({cost_band}). Spends gold; the item is known before paying."
         not_for: "An item that does not fit `build.identity`, or an unknown item when a chest is affordable."
       repair_drone:                                # jev-03
-        what: "Repair the broken drone you are standing at ({cost_band}). Spends gold that a chest could have used; it then fights alongside the character until it is destroyed."
-        not_for: "When the gold is needed for a chest."
+        what: "Repair {target}. Spends gold once; it then follows the character for the rest of the stage, and a healing drone is worth as much as an item."
+        not_for: "Gold the character has already decided a chest needs."
       fight_nearby:                                # jev-02
         what: "Stay and fight the enemies nearby until they are dead. Kills give gold and experience."
         not_for: "Health too low to keep trading hits, or an enemy group too strong to win against."

@@ -329,6 +329,21 @@ def trace_refused_action_is_withheld():
           str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
 
 
+def trace_declined_in_range():
+    print("\njev-14: walking back to something JEV keeps passing over in range is withheld")
+    fr = frames(True)   # the chest is 3 m away: open_chest is offered every tick
+    asked: list = []
+    p, rec = run([fr] * 6, pick="explore", asked=asked)   # JEV always picks explore instead
+    check("the chest is offered at first",
+          any(k.startswith("open_chest") for k in asked[0]["questions"]["next_action"]["criteria"]))
+    check("after DECLINE_LIMIT passes, it is withheld",
+          any(f.get("note") == "declined_in_range" for f in rec.frames),
+          str([f for f in rec.frames if f.get("type") == "HARNESS_NOTE"]))
+    check("and the last ticks no longer offer it",
+          not any(k.startswith("open_chest") for k in asked[-1]["questions"]["next_action"]["criteria"]),
+          str(sorted(asked[-1]["questions"]["next_action"]["criteria"])))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -341,7 +356,8 @@ if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
               trace_equipment, trace_redirect, trace_stuck_walk,
-              trace_refused_action_is_withheld, trace_dead_asks_nothing):
+              trace_refused_action_is_withheld,
+              trace_declined_in_range, trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
