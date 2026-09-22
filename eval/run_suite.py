@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 PYTHON_TRACES = ["eval/test_chest_trace.py", "eval/test_lifecycle_traces.py",
-                 "eval/test_phase0.py", "eval/test_driver.py"]
+                 "eval/test_phase0.py", "eval/test_driver.py", "eval/test_jev_loop.py"]
 
 #: Traces owed by targets that do not exist yet. Listed so the gap is explicit.
 CSHARP_OWED = ["T1-T4", "T6-T14", "T23-T32", "L1-L4"]
@@ -77,10 +77,10 @@ def main() -> int:
     print("  [NOT IMPLEMENTED]  0 passed, 0 failed, "
           f"{len(INGAME_OWED)} traces owed")
     print(f"      owed: {', '.join(INGAME_OWED)}")
-    print("      blocker: the fork (mod/, builds 0-3) implements no protocol v2 yet;")
-    print("      builds 1-2 are verified in game, build 3 is not. Phase 0's go/no-go")
-    print("      PASSED against STOCK 1.1.1 (recordings/gonogo-03 opened a chest end to")
-    print("      end), which proves the")
+    print("      blocker: the fork (mod/, see contract/pinned-build.yaml for builds and")
+    print("      which are verified in game) implements no protocol v2 yet. Phase 0's")
+    print("      go/no-go PASSED against STOCK 1.1.1 (recordings/gonogo-03 opened a chest")
+    print("      end to end), which proves the")
     print("      game and mod stack work -- not that protocol v2's typed targets,")
     print("      lifecycle and token rules behave correctly under Unity.")
     print()
@@ -103,7 +103,7 @@ def main() -> int:
           "that is evidence")
     print("                    about STOCK Rainflayer 1.1.1. No protocol v2 conformance "
           "has run in")
-    print("                    game: the fork exists (builds 0-3) but does not speak v2 "
+    print("                    game: the fork exists but does not speak v2 "
           "yet.")
     print("=" * 72)
     return 1 if total_f or gen.returncode else 0

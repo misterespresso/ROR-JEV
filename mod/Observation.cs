@@ -276,6 +276,37 @@ namespace Rainflayer
             }) + "}";
         }
 
+        /// <summary>
+        /// The available interactable with this instance ID (build 8, INTERACT_ID), or null if
+        /// it no longer exists or has been used. Same lists and availability rule as the
+        /// snapshot, refreshed first if stale, so an ID JEV saw is resolved the same way.
+        /// </summary>
+        public static GameObject? FindInteractable(int id, out int cost, out string costType)
+        {
+            cost = 0;
+            costType = "None";
+            if (Time.realtimeSinceStartup - interactableCacheAt > INTERACTABLE_CACHE_S)
+            {
+                purchaseCache = UnityEngine.Object.FindObjectsOfType<PurchaseInteraction>();
+                barrelCache = UnityEngine.Object.FindObjectsOfType<BarrelInteraction>();
+                interactableCacheAt = Time.realtimeSinceStartup;
+            }
+            foreach (var pi in purchaseCache)
+            {
+                if (pi == null || pi.gameObject.GetInstanceID() != id) continue;
+                if (!pi.available) return null;
+                cost = pi.cost;
+                costType = pi.costType.ToString();
+                return pi.gameObject;
+            }
+            foreach (var bi in barrelCache)
+            {
+                if (bi == null || bi.gameObject.GetInstanceID() != id) continue;
+                return bi.Networkopened ? null : bi.gameObject;
+            }
+            return null;
+        }
+
         /// <summary>The prefab name: the GameObject name without Unity's "(Clone)" suffix.</summary>
         static string Prefab(GameObject go)
         {

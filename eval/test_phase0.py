@@ -750,7 +750,7 @@ def trace_full_interactables():
     ids = [i["entity_id"] for i in ad.raw["interactables"]]
     check("stock's cone chest is replaced; its teleporter is kept",
           any(i.startswith("teleporter") for i in ids) and "chest-0" not in ids, str(ids))
-    check("the chest carries the game's instance ID", "chest_small-111" in ids, str(ids))
+    check("the chest carries the game's instance ID", "chest_small@111" in ids, str(ids))
     check("barrel, drone and terminal are visible but not offered",
           sorted(ad.visible_no_verb) == ["barrel", "drone", "shop_terminal"],
           str(ad.visible_no_verb))

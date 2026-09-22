@@ -281,6 +281,12 @@ namespace Rainflayer
                         HandleFindAndInteract(args);
                         break;
 
+                    // ROR-JEV (build 8): go to ONE object, named by the instance ID the
+                    // OBSERVATION reported, and interact. What JEV picked, not the nearest.
+                    case "INTERACT_ID":
+                        HandleInteractId(args);
+                        break;
+
                     // Debug command: List all chests in scene
                     case "DEBUG_CHESTS":
                         HandleDebugChests();
@@ -891,6 +897,54 @@ namespace Rainflayer
             }
         }
 
+        void HandleInteractId(string args)
+        {
+            string label = $"INTERACT_ID:{args?.Trim()}";
+            CharacterBody body = RainflayerPlugin.GetPlayerBody();
+            if (body == null || !int.TryParse(args?.Trim(), out int id))
+            {
+                socketBridge?.SendEvent("action_failed", ("command", label), ("reason", "bad_args"));
+                return;
+            }
+
+            GameObject obj = Observation.FindInteractable(id, out int cost, out string costType);
+            if (obj == null)
+            {
+                // Gone, already used, or never existed: the brain's view is stale.
+                socketBridge?.SendEvent("action_failed", ("command", label), ("reason", "not_found"));
+                return;
+            }
+
+            if (costType == "Money")
+            {
+                int gold = (int)(body.master?.money ?? 0);
+                if (gold < cost)
+                {
+                    socketBridge?.SendEvent("action_failed", ("command", label), ("reason", "no_gold"),
+                        ("cost", cost.ToString()), ("current_gold", gold.ToString()));
+                    return;
+                }
+            }
+
+            float dist = Vector3.Distance(body.transform.position, obj.transform.position);
+            var target = new InteractableInfo
+            {
+                GameObject = obj,
+                Type = "entity",                 // ordinary navigate-then-interact
+                Name = id.ToString(),            // completion is reported as INTERACT_ID:<id>
+                Cost = cost,
+                Position = obj.transform.position,
+                Distance = dist,
+            };
+            navigationController.gotoTarget = obj;
+            navigationController.gotoInteractable = target;
+            navigationController.isNavigating = true;
+
+            socketBridge?.SendEvent("action_started", ("command", label),
+                ("target", obj.name), ("distance", ((int)dist).ToString()), ("cost", cost.ToString()));
+            Log($"[INTERACT_ID] Going to {obj.name} (id {id}) at {dist:F1}m, cost {cost} {costType}");
+        }
+
         void HandleDebugChests()
         {
             /* Debug command: List all chests in the scene.
@@ -1227,7 +1281,9 @@ namespace Rainflayer
                                 else
                                 {
                                     // Store command string so action_complete can match the ledger entry
-                                    navigationController.lastInteractionCommand = $"FIND_AND_INTERACT:{interactable.Type}";
+                                    navigationController.lastInteractionCommand = interactable.Type == "entity"
+                                        ? $"INTERACT_ID:{interactable.Name}"
+                                        : $"FIND_AND_INTERACT:{interactable.Type}";
                                     navigationController.StartInteraction(interactable.GameObject);
                                     // Pillar: record which island we're on so PrependZoneReturnToTarget
                                     // can dynamically build the correct return chain for the next command.

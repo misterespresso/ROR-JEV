@@ -348,7 +348,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                 out.visible_no_verb.append(t)
                 continue
             dist = num(it.get("distance"), 1e9)
-            eid = f"{t}-{it.get('id')}"
+            eid = f"{t}@{it.get('id')}"          # `@` marks a real instance ID (stock_bridge)
             in_range = dist is not None and dist <= range_m
             cost = num(it.get("cost"), 0)
             ilist.append({
