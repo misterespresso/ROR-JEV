@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **350 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 17** `C7CA0643…` (`python tools/deploy.py --status`) |
+| Deployed | **build 18** `1F925615…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -38,7 +38,8 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 14 | Arrival fix + give-up report (F46); barrels in passing (F47) | **yes** — jev-10, jev-11 |
 | 15 | Barrel reflex 6 m | **yes** — jev-12 |
 | 16 | Fire while travelling (F50) | **yes** — jev-13 |
-| 17 | Seen-only interactables; loot watch (F52, F53) | **deployed** `C7CA0643…` from `64a6826`; not yet run |
+| 17 | Seen-only interactables; loot watch (F52, F53) | **never ran** — the game was not restarted (F56) |
+| 18 | Reports `mod_build`; seen-check fix (F56, F57) | **deployed** `1F925615…` from `9d90bc8`; not yet run |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -177,7 +178,10 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
 - Build **Debug** (the stock DLL is Debug): `cd mod && dotnet build -c Debug`.
 - After every change: `python -m eval.compare_dll --installed mod/bin/Debug/netstandard2.1/Rainflayer.dll`
   — the changed-method list must be exactly what you meant to touch.
-- Deploy with the game **closed**: `python tools/deploy.py`. Then register the new hash in
+- Deploy with the game **closed**, then RESTART it: BepInEx loads the DLL at startup, so a
+  session already open keeps the old build. `jev_run` prints the running build on the first
+  frame and warns if it is not the expected one (F56).
+- `python tools/deploy.py`. Then register the new hash in
   `KNOWN_BUILDS` (`tools/deploy.py`) and `contract/pinned-build.yaml`. `--restore` puts stock back.
 - Commit before or right after deploying; `mod/deploys.log` records the source commit and marks
   `+dirty` builds.

@@ -67,6 +67,7 @@ KNOWN_BUILDS = {
     "C207AC6E286CC90A7BE9A782307A3BB13355BC3D121AEDA5136B6A069D95FE71": "fork build 15 (barrel reflex 6 m)",
     "C58B86056C3351C1FC7E1ABA08385FD32A853F07B9AC08D3488C71297F6644FE": "fork build 16 (fire while travelling)",
     "C7CA0643593A2E9358FC6C1D9C580922869EDD82CF945BBF6491F8FB35885C6C": "fork build 17 (seen-only interactables; loot watch)",
+    "1F925615E948FD00743657E26E4B1F8AD370B33470242F70C81C24F456825A8B": "fork build 18 (reports mod_build; seen fix)",
 }
 
 
@@ -158,6 +159,8 @@ def main() -> int:
     print(f"sha256 {h}")
     print()
     print("Note: r2modman's 'update' on Rainflayer would overwrite this with stock.")
+    print("RESTART THE GAME: BepInEx loads the DLL at startup, so a session that is already")
+    print("open keeps the old build (jev-14..16 ran stale this way; see F56).")
     print("Restore any time with: python tools/deploy.py --restore")
     return 0
 
