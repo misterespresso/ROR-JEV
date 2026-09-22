@@ -190,6 +190,43 @@ def trace_fight_and_primer():
           "`game`" in asked[0]["questions"]["next_action"]["instructions"])
 
 
+def trace_equipment():
+    print("\njev-05: equipment is reported, offered when it has a target, and fired")
+    from brain.equipment import band
+    check("Fruit with full health has no target", band({"name": "Fruit", "ready": True}, "healthy", None)["valid_target_available"] is False)
+    check("Fruit when hurt does", band({"name": "Fruit", "ready": True}, "hurt", None)["valid_target_available"] is True)
+    check("a missile launcher needs an enemy within 30 m",
+          band({"name": "CommandMissile", "ready": True}, "healthy", 12.0)["valid_target_available"]
+          and not band({"name": "CommandMissile", "ready": True}, "healthy", 45.0)["valid_target_available"])
+    check("the Fuel Array is never activation-compatible",
+          band({"name": "QuestVolatileBattery", "ready": True}, "low", 5.0)["activation_compatible"] is False)
+    check("unrecognised equipment is not supported", band({"name": "Mystery", "ready": True}, "low", 5.0)["supported_activation"] is False)
+    check("an empty slot is all-false, not unknown", band(None, "low", 5.0)["ready"] is False)
+
+    hurt = frames(True)
+    hurt["QUERY_OBSERVATION"]["self"].update({"hp": 40, "equipment": {"name": "Fruit", "charges": 1, "ready": True}})
+    asked: list = []
+
+    def fake(wire, **_kw):
+        asked.append(wire)
+        ans = {"next_action": {"type": "choice", "choice": "none", "confidence": 0.9,
+                               "probabilities": {"none": 0.95}}}
+        if "use_equipment_now" in wire["questions"]:
+            ans["use_equipment_now"] = {"type": "noul", "noul": 0.9}
+        return JevResult(answers=ans, usage={"input_tokens": 1}, latency_ms=1.0, model="stub")
+
+    jev_run.ask = fake
+    stop = {"flag": False}
+    p, rec = FakeProbe([hurt], stop), FakeRec()
+    a = types.SimpleNamespace(run_id="t", minutes=1.0, decide_every=0.0, dry_run=False)
+    from brain.catalog import load_contract
+    from eval.fixtures import MILESTONE_1_CAPABILITIES
+    jev_run.loop(p, rec, a, load_contract(), frozenset(MILESTONE_1_CAPABILITIES), stop)
+    check("use_equipment_now is asked when hurt with a ready Fruit",
+          asked and "use_equipment_now" in asked[0]["questions"], str(sorted(asked[0]["questions"]) if asked else []))
+    check("a confident yes fires it", ("USE_EQUIPMENT", "") in p.commands, str(p.commands))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -201,7 +238,7 @@ def trace_dead_asks_nothing():
 if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
-              trace_dead_asks_nothing):
+              trace_equipment, trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

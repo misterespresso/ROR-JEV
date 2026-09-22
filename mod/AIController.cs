@@ -293,6 +293,17 @@ namespace Rainflayer
                         HandleInteractId(args, interact: false);
                         break;
 
+                    // ROR-JEV (build 10): fire the equipment now, if it has a charge.
+                    case "USE_EQUIPMENT":
+                    {
+                        var b = RainflayerPlugin.GetPlayerBody();
+                        bool fired = b && b.equipmentSlot && b.equipmentSlot.stock > 0
+                                     && b.equipmentSlot.ExecuteIfReady();
+                        socketBridge?.SendEvent(fired ? "action_complete" : "action_failed",
+                            ("command", "USE_EQUIPMENT"), (fired ? "status" : "reason", fired ? "success" : "not_ready"));
+                        break;
+                    }
+
                     // Debug command: List all chests in scene
                     case "DEBUG_CHESTS":
                         HandleDebugChests();
@@ -903,6 +914,41 @@ namespace Rainflayer
             }
         }
 
+        private GameObject pickupReflexTarget;
+        private float pickupReflexUntil;
+        private const float PICKUP_REFLEX_RANGE = 12f;
+        private const float PICKUP_REFLEX_S = 4f;
+
+        /// <summary>True while steering onto a dropped item; the caller skips all other logic.</summary>
+        private bool TryPickupReflex(CharacterBody body)
+        {
+            bool safe = entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE) == 0;
+            if (pickupReflexTarget == null && safe && Time.frameCount % 15 == 0)
+            {
+                GameObject p = entityDetector.FindNearestPickup(range: PICKUP_REFLEX_RANGE);
+                var ctrl = p != null ? p.GetComponent<GenericPickupController>() : null;
+                PickupDef def = ctrl != null ? PickupCatalog.GetPickupDef(ctrl.pickupIndex) : null;
+                if (def != null && def.equipmentIndex == EquipmentIndex.None)
+                {
+                    pickupReflexTarget = p;
+                    pickupReflexUntil = Time.time + PICKUP_REFLEX_S;
+                    Log($"[PICKUP] steering onto dropped item '{def.internalName}'");
+                }
+            }
+            if (pickupReflexTarget == null)
+                return false;
+            if (!safe || Time.time > pickupReflexUntil || !pickupReflexTarget
+                || !pickupReflexTarget.activeInHierarchy)
+            {
+                pickupReflexTarget = null;       // taken, gone, timed out, or a fight started
+                return false;
+            }
+            Vector3 dir = pickupReflexTarget.transform.position - body.transform.position;
+            dir.y = 0f;
+            body.inputBank.moveVector = navigationController.ApplyJumpDetection(body, dir.normalized);
+            return true;
+        }
+
         void HandleInteractId(string args, bool interact)
         {
             string key = args?.Trim() ?? "";
@@ -1076,6 +1122,15 @@ namespace Rainflayer
                     navigationController.HandleDropPodExit(body);
                     return; // Don't do other AI behavior until we've exited drop pod
                 }
+
+                // === ROR-JEV (build 10): ITEM PICKUP REFLEX ===
+                // jev-05: a chest opened and its item stayed on the ground all run. The pickup
+                // below works by setting the nav target, which every JEV command overwrites
+                // within seconds. Taking an item is never a decision, so this steers straight
+                // onto it FIRST and returns, for at most PICKUP_REFLEX_S. Equipment is left alone:
+                // taking it swaps the equipment carried, which is a decision.
+                if (entityDetector != null && TryPickupReflex(body))
+                    return;
 
                 // === PHASE 2.5: AUTOMATIC DROPPED ITEM PICKUP ===
                 // Check for nearby dropped items and automatically collect them

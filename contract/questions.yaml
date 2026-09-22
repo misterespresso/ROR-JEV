@@ -309,8 +309,9 @@ payload:
 
   use_equipment_now:
     instructions: >-
-      Should the character trigger `self.equipment.name` right now? Judge whether this
-      moment justifies spending a limited-cooldown item of that kind.
+      Should the character trigger `self.equipment.name` right now?
+      `self.equipment.what_it_does` says what it does. Judge whether this moment justifies
+      spending a limited-cooldown item of that kind.
     criteria:
       "true": "This moment justifies spending this particular equipment."
       "false": "Hold it. A clearly better moment is close, or the situation does not warrant it."

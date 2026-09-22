@@ -168,6 +168,8 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F39 | **JEV could not choose to fight**, and had no idea how the game is played | **fixed** — `fight_nearby` option; `game` primer in every request |
 | F40 | **Identical walk options split JEV's vote below the gate**; equipment barrels, terminals, barrels, drones had no action | **fixed** — one walk per kind; four new verbs; chest-priority fact in the primer |
 | F41 | **Category chests were one kind** (Damage/Healing/Utility indistinguishable), and cost read 'expensive' against a fixed 25 gold | **fixed** — six variant kinds that say what they guarantee; cost banded against gold on hand |
+| F42 | **Dropped items were left on the ground**: the pickup set a nav target every JEV command overwrote | **fixed in build 10** — pickup reflex that runs first |
+| F43 | **Equipment was picked up and never used**: nothing reported readiness or fired it | **fixed in build 10** — readiness in OBSERVATION, `USE_EQUIPMENT`, equipment table; capability pulled into milestone 1 |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1278,6 +1280,28 @@ Fixed: six kinds (`chest_damage`, `chest_healing`, `chest_utility`, and `_large`
 non-gold costs. Re-asking 5 of jev-04's ticks with an affordable variant: the variants now draw
 0.09-0.22; JEV still mostly prefers the cheaper small chest, with `build.identity` undefined
 (Bustling Fungus, Medkit) -- a defensible call.
+
+
+### F42 — Items dropped from chests stayed on the ground
+
+jev-05: the chest opened at 96 s (`INTERACT_ID` complete) and the inventory's item list never grew.
+The mod's auto-pickup (every 2 s, no enemy within 10 m) works by setting the navigation target,
+and the JEV loop's next command -- every 2-4 s -- overwrote it. Taking a dropped item is never a
+decision, so build 10 makes it a reflex that runs before everything else in `FixedUpdateAI`:
+steer straight onto the nearest item within 12 m while no enemy is within 10 m, at most 4 s,
+then return control. Equipment pickups are excluded (taking one swaps the carried equipment --
+a decision) and lunar coins stay excluded as before.
+
+### F43 — Equipment was picked up and never used
+
+jev-05: a Foreign Fruit was carried from 77 s and never triggered. `use_equipment_now` needs four
+facts (supported, ready, a valid target, compatible) and nothing produced them; the capability
+sat in phase 4 and the fork had no command. Build 10 reports `self.equipment` (name, charges,
+ready) and adds `USE_EQUIPMENT` (`EquipmentSlot.ExecuteIfReady`); `brain/equipment.py` says what
+each does and when a use has a target at all (`enemies` within 30 m / `hurt` / `anytime` /
+`never` -- the Fuel Array); the capability moves to phase 2 and milestone 1 by decision. On a real
+jev-05 tick with a ready Fruit: not asked at full health, noul 0.69 at 60 % (fires above 0.65),
+0.74 at 15 %.
 
 ---
 

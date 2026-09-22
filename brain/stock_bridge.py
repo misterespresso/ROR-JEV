@@ -71,6 +71,8 @@ def to_mod(cmd: Command) -> ModCommand | None:
     if c == "SET_POSTURE":
         s = a.get("strategy")
         return ModCommand("STRATEGY", s, False, f"STRATEGY:{s}") if s else None
+    if c == "USE_EQUIPMENT":
+        return ModCommand("USE_EQUIPMENT", "", False, "USE_EQUIPMENT")
     if c == "CANCEL":
         return ModCommand("GOTO", "cancel", False, "GOTO:cancel")
-    return None     # FIGHT_TARGET, DISENGAGE, USE_EQUIPMENT: no fork counterpart yet
+    return None     # FIGHT_TARGET, DISENGAGE: no fork counterpart yet

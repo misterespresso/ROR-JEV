@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
 from .enemy_class import band_threat
+from .equipment import band as band_equipment
 from .interactable_type import REGISTRY_TYPE, classify as classify_prefab, shop_item_name
 from .build_identity import describe_item
 
@@ -448,6 +449,12 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         out.banded["hazards"] = ob["hazards"]
         if ob["threat"]:
             out.banded["threat"].update(ob["threat"])
+        # Build 10+: the equipment block (absent key = older build -> leave it out, so
+        # use_equipment_now stays omitted rather than guessed).
+        if isinstance(observation.get("self"), dict) and "equipment" in observation["self"]:
+            out.banded["self"]["equipment"] = band_equipment(
+                observation["self"]["equipment"], out.banded["self"]["hp_band"],
+                out.raw["threat"].get("nearest_enemy_m"))
         out.raw.update({k: observation[k] for k in ("run", "self", "hazards")
                         if k in observation})
     return out

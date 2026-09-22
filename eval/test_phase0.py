@@ -105,8 +105,9 @@ def trace_capability_gating():
     print("\nT17 / C3: an absent capability removes the question and the registry record")
     sc = _sc("chest_in_range")
     req, reg = _build(sc)
-    check("milestone 1 has no `equipment` capability", "equipment" not in CAPS)
-    check("use_equipment_now never sent", "use_equipment_now" not in req.questions)
+    check("equipment capability is in milestone 1 (pulled forward, jev-05)", "equipment" in CAPS)
+    check("use_equipment_now not sent without equipment ready to fire",
+          "use_equipment_now" not in req.questions)
     check("situation_is_novel never sent with counsel off",
           "situation_is_novel" not in req.questions)
 
@@ -186,7 +187,7 @@ def trace_condition_grammar():
     ctx = BuildContext(CAPS, {}, False, False)
     check("always -> true", evaluate_condition("always", ctx))
     check("capability(present) -> true", evaluate_condition("capability(search)", ctx))
-    check("capability(absent) -> false", not evaluate_condition("capability(equipment)", ctx))
+    check("capability(absent) -> false", not evaluate_condition("capability(fight_target)", ctx))
     check("conjunction requires every term",
           not evaluate_condition("capability(search) and counsel_enabled", ctx))
     for bad in ("capability(search) or counsel_enabled", "not counsel_enabled"):

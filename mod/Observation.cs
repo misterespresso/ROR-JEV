@@ -105,6 +105,16 @@ namespace Rainflayer
                 P("barrier", F(hc.barrier)),
                 P("alive", B(hc.alive)),
             };
+            // ROR-JEV (build 10): equipment readiness. Stock INVENTORY names the equipment but
+            // not whether it can fire, so use_equipment_now could never be asked (jev-05).
+            var slot = body.equipmentSlot;
+            var eqDef = EquipmentCatalog.GetEquipmentDef(body.inventory ? body.inventory.currentEquipmentIndex : EquipmentIndex.None);
+            selfFields.Add(P("equipment", eqDef == null ? "null" : "{" + string.Join(",", new[]
+            {
+                P("name", S(eqDef.name ?? "")),
+                P("charges", (slot ? slot.stock : 0).ToString(CultureInfo.InvariantCulture)),
+                P("ready", B(slot && slot.stock > 0)),
+            }) + "}"));
 
             // --- hazards -----------------------------------------------------------
             float now = Time.realtimeSinceStartup;

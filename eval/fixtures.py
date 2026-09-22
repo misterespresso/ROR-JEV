@@ -13,10 +13,10 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-#: Milestone 1: Commando, Drizzle, solo, L2 disabled, no equipment capability.
+#: Milestone 1: Commando, Drizzle, solo, L2 disabled. Equipment pulled forward (jev-05).
 MILESTONE_1_CAPABILITIES = frozenset({
     "observation_v2", "navigate_target", "interact_target", "search",
-    "set_posture", "disengage", "defend_zone", "fight_nearby",
+    "set_posture", "disengage", "defend_zone", "fight_nearby", "equipment",
 })
 
 RAW_BASE: dict = {
