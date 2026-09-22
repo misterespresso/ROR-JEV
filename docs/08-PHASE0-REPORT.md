@@ -160,6 +160,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F31 | **`run_suite` reported a crashing test file as PASS** (0 passed, 0 failed) | **fixed** — a crash or a non-zero exit is now a failure |
 | F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | **fixed** — `build_request` asks nothing when `self.hp_band` is `dead` |
 | F33 | **Combat movement walks and rolls off cliffs**: backing away and the utility dash have no edge check | **fixed in fork build 5** — not yet verified in game |
+| F34 | **Combat target choice is fixed in the mod, not JEV's**: boss +50 wins, then sticks | open — needs a target-priority channel and readable item effects |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1153,6 +1154,22 @@ movement and the dash check.
 The same run is the first real evidence for builds 2 and 4: every fall registered as
 environmental damage, and the threat block classified every body it saw (Beetle, Lemurian,
 Golem). `engage_range` was sendable on 13 of 18 ticks.
+
+
+### F34 — Who to shoot is the mod's decision, and JEV cannot change it
+
+fork-09: the person watching saw the character, holding Monster Tooth (kills drop healing orbs),
+fire only at the Stone Titan while 17-18 smaller enemies wore it down; it died. The target is
+chosen by `EntityDetector.FindBestTarget`'s fixed score -- boss +50, already in the crosshair
++40, elite +30, closeness up to +30, low health up to +20 -- so a boss wins and then holds. No
+question in the catalog reaches it: `strategy` and `engage_range` set distance and aggression,
+not the target. JEV also cannot see *why* Monster Tooth matters: `build.key_items` sends
+internal names only, and identity counts it toward `survival`.
+
+Making it JEV's call needs (1) a target-priority setting the mod obeys (e.g. boss / clear adds /
+nearest), asked as a question, with today's score as the default; and (2) item effects in
+state that JEV can read -- a one-line effect per item from the identity table would do.
+After build 6 (visibility).
 
 ---
 

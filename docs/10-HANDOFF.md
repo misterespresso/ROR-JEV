@@ -26,7 +26,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 
 | 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | loads (cfg key written); superseded by build 4 before a run was recorded |
 | 4 | `OBSERVATION` gains a `threat` block: enemy/elite/boss/targeting counts within 50 m, 16 nearest with body, team, elite, boss, flying, distance, targeting | **yes** — fork-07: 18 frames, every body classified; `engage_range` sendable 13/18 |
-| 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **no falls** — fork-09 (6 min, Verdant Falls, 274 frames with enemies, 0 environmental damage); stuck-on-terrain still to confirm by eye |
+| 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **no falls** — fork-09 (6 min, Verdant Falls, 274 frames with enemies, 0 environmental damage); minor stalls on terrain, recovered; accepted — no more movement tuning |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -125,8 +125,9 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    in the OBSERVATION (raw name, cost, cost type, available, distance; shop item + hidden flag),
    a reviewable name → type table in the brain, then verbs for the new types (shop pick revives
    the deferred `shop_item_pick`). Types the mod says "require pressing E" need an in-game check.
-7. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.
-8. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
+7. **F34 — target priority as a JEV decision**, plus readable item effects. After build 6.
+8. **Path feasibility** — the expensive telemetry; unblocks `strategy` and `engagement_response`.
+9. Fork work the runs already justify: exactly one terminal event per command (F25), `low_health`
    on the crossing only (F26), events emitted from game hooks so human runs have them (F20), one
    snapshot replacing the separate queries (F22), entity IDs and positions (F17, F12).
 
