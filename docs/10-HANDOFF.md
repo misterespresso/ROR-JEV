@@ -13,7 +13,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | Brain | contract implemented; **334 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
-| Deployed | **build 9** `CCA56F5A…` (`python tools/deploy.py --status`) |
+| Deployed | **build 10** `D8E141EF…` (`python tools/deploy.py --status`) |
 | Git | local only, no remote, clean history |
 
 ## Builds
@@ -31,7 +31,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 7 | Edge check walks drops ≤ 8 m; after 2 s cornered, escapes over the shortest drop (fork-10 was stuck a minute on a dome) | **deployed** `CF618C83…` from `74f106b`; not yet run |
 | 8 | `INTERACT_ID <instance id>`: go to the one object JEV picked and interact; events labelled `INTERACT_ID:<id>` | **yes** — jev-01: JEV's picks executed (and exposed F35) |
 | 9 | `GOTO_ID <id\|teleporter>`: navigate walks and stops (F35) | **deployed** `CCA56F5A…` from `993d86b`; not yet run |
-| 10 | Pickup reflex (F42); `self.equipment` readiness + `USE_EQUIPMENT` (F43) | built from `dfd7a5e`; **not deployed** (game was running) |
+| 10 | Pickup reflex (F42); `self.equipment` readiness + `USE_EQUIPMENT` (F43) | **deployed** `D8E141EF…` from `dfd7a5e`; not yet run |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -140,7 +140,7 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    JEV's vote below the gate and terminals/equipment barrels had no action (F40, fixed brain
    side). jev-04: chests between fights; variant chests flattened (F41, fixed). Walks past
    barrels (accepted). jev-05: items left on the ground (F42), equipment never used (F43) --
-   both fixed in build 10. Next: deploy build 10, run jev-06. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
+   both fixed in build 10. Next: run jev-06 (build 10 deployed). Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
    Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
    request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
    → the game. `--dry-run` asks JEV and sends nothing. Records `JEV_EXCHANGE` (request, answers,
