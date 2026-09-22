@@ -174,6 +174,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F45 | **Combat target thrash and shots into walls**: target re-picked every frame; lenient multi-height LOS | **fixed in build 12** — target lock; clear-shot ray from the aim origin |
 | F46 | **A walk that never arrived froze the agent**: 3D arrival radius, and giving up was silent | **fixed in build 14** — horizontal arrival, give-up reported, stuck walks abandoned and set aside |
 | F47 | Barrels were run past for five runs | **fixed in build 14** — free, so opened in passing as a reflex |
+| F48 | **A gate-refused pick deadlocked the tick**: JEV re-picked it every 2 s and nothing was sent | **fixed** — a refused action is withheld for 30 s |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1380,6 +1381,24 @@ JEV's options for 60 s so the next tick is not handed the same unreachable thing
 
 Free, so opening one within 4 m with no enemy near is a reflex (build 14), like the dropped-item
 pickup. Walking to a distant barrel stays JEV's choice.
+
+
+### F48 — Refused, re-picked, refused: the character stood at the shrine
+
+jev-10 (build 14): the mod reached the Shrine of Chance -- F46 fixed -- and `use_shrine_chance`
+was offered 9 times. JEV chose it 4 times and `worth_use_shrine_chance` came back **0.26-0.53**
+against the 0.75 an irreversible action needs, so the dispatcher refused it three times and the
+tick sent nothing. Next tick: same options, same choice, same refusal.
+
+The gate is the design working (`06-ACTION-REGISTRY.md`: irreversible actions carry a worth Noul,
+and a shrine gamble is one-way). The deadlock is not. A gate-refused action is now withheld from
+the options for 30 s, so the next tick's pick is a different one and the run moves on; the
+refusal still stands and is still recorded.
+
+**Worth watching:** JEV rates the Shrine of Chance 0.26-0.53 consistently, well under 0.75, so
+shrines will rarely be used. That is JEV's judgement of a gamble, not a defect -- but if shrines
+should be taken more often, the lever is `WORTH_THRESHOLD` (0.75, `brain/registry.py`), a design
+constant, not the gate.
 
 ---
 

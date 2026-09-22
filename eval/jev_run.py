@@ -63,6 +63,12 @@ STUCK_AFTER_S = 12.0
 STUCK_PROGRESS_M = 1.0
 QUARANTINE_S = 60.0
 
+#: jev-10: JEV chose the Shrine of Chance, the worth gate refused it (0.26-0.53 against 0.75),
+#: the tick sent nothing, and the next tick chose it again -- the character stood at the shrine.
+#: A refused action is withheld from the options this long, so the next pick is a different one.
+#: The refusal stands; JEV simply is not asked the same unanswerable question every 2 s.
+REFUSED_SUPPRESS_S = 30.0
+
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
 
@@ -158,6 +164,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
     last_choice = "-"
     redirect = {"to": None, "n": 0}
     quarantined: dict[str, float] = {}
+    refused: dict[str, float] = {}
 
     while not stop["flag"] and not p.lost and time.monotonic() < t_end:
         now = time.monotonic()
@@ -238,6 +245,10 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         ad.raw["t_capture_mono_ms"] = int(now * 1000)
         active = life.has_active_task()
         reg = build_registry(ad.raw, set(caps), active)
+        refused = {k: v for k, v in refused.items() if v > now}
+        for aid in list(reg):
+            if aid in refused:
+                reg.pop(aid)        # gate-refused recently: offering it again just stalls
         req = build_request(ad.banded, reg, BuildContext(caps, ad.banded, active, False),
                             contract)
         if not req.questions:
@@ -280,6 +291,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         d = dispatch(ad.raw, res.answers, reg, life, set(caps))
         for note in d.notes:
             rec.record({"type": "HARNESS_NOTE", "note": "dispatch", **note})
+            if note.get("not_authorized") and note.get("action"):
+                refused[str(note["action"])] = now + REFUSED_SUPPRESS_S
         sel = res.answers.get("next_action") or {}
         last_choice = f"{sel.get('choice', '-')} p={max((sel.get('probabilities') or {0: 0}).values()):.2f}" if sel else "-"
         for cmd in d.commands:

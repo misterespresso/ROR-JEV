@@ -284,6 +284,42 @@ def trace_stuck_walk():
     check("only one walk was ever sent", len([c for c in p.commands if c[0] == "GOTO_ID"]) == 1, str(p.commands))
 
 
+def trace_refused_action_is_withheld():
+    print("\njev-10: a gate-refused action is withheld, so the next tick moves on")
+    fr = frames(True)
+    fr["QUERY_OBSERVATION"]["interactables"]["items"].append(
+        {"id": -55555, "kind": "purchase", "prefab": "ShrineChance", "display": "Shrine of Chance",
+         "cost": 25, "cost_type": "Money", "distance": 3.0, "height": 0.0})
+    asked: list = []
+
+    def fake(wire, **_kw):
+        asked.append(wire)
+        opts = wire["questions"]["next_action"]["criteria"]
+        choice = next((k for k in opts if k.startswith("use_shrine_chance")), "explore")
+        ans = {"next_action": {"type": "choice", "choice": choice, "confidence": 0.9,
+                               "probabilities": {choice: 0.9}}}
+        for q in wire["questions"]:
+            if q.startswith("worth_"):
+                ans[q] = {"type": "noul", "noul": 0.3}      # JEV: not worth it
+        return JevResult(answers=ans, usage={"input_tokens": 1}, latency_ms=1.0, model="stub")
+
+    jev_run.ask = fake
+    stop = {"flag": False}
+    p, rec = FakeProbe([fr] * 3, stop), FakeRec()
+    a = types.SimpleNamespace(run_id="t", minutes=1.0, decide_every=0.0, dry_run=False)
+    from brain.catalog import load_contract
+    from eval.fixtures import MILESTONE_1_CAPABILITIES
+    jev_run.loop(p, rec, a, load_contract(), frozenset(MILESTONE_1_CAPABILITIES), stop)
+    check("the shrine is offered on the first tick",
+          any(k.startswith("use_shrine_chance") for k in asked[0]["questions"]["next_action"]["criteria"]))
+    check("the worth gate refuses it",
+          any(f.get("not_authorized") == "worth_gate" for f in rec.frames), str(rec.frames[:3]))
+    check("and it is withheld afterwards",
+          all(not any(k.startswith("use_shrine_chance") for k in w["questions"]["next_action"]["criteria"])
+              for w in asked[1:]), str([sorted(w["questions"]["next_action"]["criteria"]) for w in asked[1:]][:1]))
+    check("so something else is sent instead", ("MODE", "roam") in p.commands, str(p.commands))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -296,7 +332,7 @@ if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
               trace_equipment, trace_redirect, trace_stuck_walk,
-              trace_dead_asks_nothing):
+              trace_refused_action_is_withheld, trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
