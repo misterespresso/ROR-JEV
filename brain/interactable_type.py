@@ -20,7 +20,14 @@ RULES: list[tuple[str, str]] = [
     (r"Chest1$", "chest_small"),
     (r"Chest2$", "chest_large"),
     (r"GoldChest$", "chest_legendary"),
-    (r"CategoryChest2?(Damage|Healing|Utility)", "chest_category"),
+    # jev-04: one "chest_category" hid which item a chest guarantees, and one-walk-per-kind
+    # then offered only one of three. Each variant is its own kind.
+    (r"CategoryChest2Damage", "chest_damage_large"),
+    (r"CategoryChest2Healing", "chest_healing_large"),
+    (r"CategoryChest2Utility", "chest_utility_large"),
+    (r"CategoryChestDamage", "chest_damage"),
+    (r"CategoryChestHealing", "chest_healing"),
+    (r"CategoryChestUtility", "chest_utility"),
     (r"CasinoChest", "chest_adaptive"),
     (r"EquipmentBarrel", "equipment_barrel"),
     (r"Barrel1", "barrel"),                         # free; gives gold and experience
@@ -48,7 +55,13 @@ _COMPILED = [(re.compile(p), t) for p, t in RULES]
 #: How a type reads in option text (F36). Types not listed read as their name with spaces.
 LABELS: dict[str, str] = {
     "chest_small": "small chest", "chest_large": "large chest",
-    "chest_legendary": "legendary chest", "chest_category": "category chest",
+    "chest_legendary": "legendary chest",
+    "chest_damage": "damage chest (always a damage item)",
+    "chest_healing": "healing chest (always a healing item)",
+    "chest_utility": "utility chest (always a utility item)",
+    "chest_damage_large": "large damage chest (always an uncommon damage item)",
+    "chest_healing_large": "large healing chest (always an uncommon healing item)",
+    "chest_utility_large": "large utility chest (always an uncommon utility item)",
     "chest_adaptive": "adaptive chest", "shrine_chance": "Shrine of Chance",
     "shrine_blood": "Shrine of Blood", "barrel": "barrel", "drone": "broken drone",
     "turret": "broken turret", "printer": "printer", "shop_terminal": "shop terminal",
@@ -65,7 +78,8 @@ REGISTRY_TYPE: dict[str, str] = {
     "chest_small": "chest",
     "chest_large": "chest",
     "chest_legendary": "chest",
-    "chest_category": "chest",
+    "chest_damage": "chest", "chest_healing": "chest", "chest_utility": "chest",
+    "chest_damage_large": "chest", "chest_healing_large": "chest", "chest_utility_large": "chest",
     "shrine_chance": "shrine_chance",
     "shrine_blood": "shrine_blood",
     # jev-03

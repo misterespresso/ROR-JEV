@@ -730,6 +730,16 @@ def trace_full_interactables():
           and ctype("MultiShopTerminal") == "shop_terminal")
     check("Chest1 is not Chest2", ctype("Chest1") == "chest_small" and ctype("Chest2") == "chest_large")
     check("unknown prefab stays unclassified", ctype("SomethingNew") is None)
+    check("jev-04: each category chest is its own kind",
+          (ctype("CategoryChestDamage"), ctype("CategoryChestHealing"), ctype("CategoryChestUtility"),
+           ctype("CategoryChest2Damage"))
+          == ("chest_damage", "chest_healing", "chest_utility", "chest_damage_large"))
+    from brain.interactable_type import label
+    check("and says what it guarantees", "always a healing item" in label("chest_healing"))
+    from brain.stock_adapter import _cost_band
+    check("cost is banded against gold on hand (jev-04: 30 gold read 'expensive')",
+          (_cost_band(30, "Money", 40), _cost_band(30, "Money", 20), _cost_band(0, "None", 5),
+           _cost_band(1, "LunarCoin", 5)) == ("affordable", "unaffordable", "free", "costs lunarcoin"))
     from brain.stock_adapter import _gold_band
     check("gold is banded against the cheapest price on offer",
           (_gold_band(24, [25, 50]), _gold_band(30, [25]), _gold_band(60, [25]))

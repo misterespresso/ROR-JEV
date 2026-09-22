@@ -255,6 +255,19 @@ class Adapted:
     visible_no_verb: list[str] = field(default_factory=list)
 
 
+def _cost_band(cost, cost_type, gold) -> str:
+    """Whether the character can pay, not whether a price is "cheap" (jev-04: 30-gold category
+    chests read "expensive" against a fixed 25-gold cut while the character could afford them).
+    Gold prices are compared with gold on hand; other currencies say what they cost in."""
+    if not cost or num(cost, 0) <= 0:
+        return "free"
+    if str(cost_type) not in ("Money", "gold"):
+        return f"costs {str(cost_type).lower()}"
+    if gold is None:
+        return UNKNOWN
+    return "affordable" if gold >= num(cost, 0) else "unaffordable"
+
+
 def _gold_band(gold: int | None, prices: list[int] | None = None) -> str:
     """Gold against the cheapest gold-priced thing on offer, so JEV can tell whether it can
     pay (jev-01: "has_gold" said nothing about a 25-gold chest). Without prices, the honest
@@ -330,8 +343,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
             "path_reachable": True, "reachability_age_ms": UNKNOWN,
         })
         cands.append({"id": eid, "type": mapped,
-                      "cost_band": "cheap" if (num(it.get("cost"), 0) or 0) <= 25
-                      else "expensive",
+                      "cost_band": _cost_band(num(it.get("cost"), 0), "Money", gold),
                       "distance_band": _nearest_band(dist), "reachable": True})
 
     # Build 6+: the mod's full-stage list replaces stock's camera cone (F12) for everything but
@@ -369,7 +381,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
             cands.append({"id": eid, "type": rtype, "kind": t,
                           **({"item": describe_item(item, bool(it.get("shop_hidden")))}
                              if "shop_hidden" in it else {}),
-                          "cost_band": "cheap" if (cost or 0) <= 25 else "expensive",
+                          "cost_band": _cost_band(cost, it.get("cost_type"), gold),
                           "distance_band": _nearest_band(dist), "reachable": True})
 
     out.raw = {

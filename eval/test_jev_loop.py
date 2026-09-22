@@ -163,7 +163,7 @@ def trace_navigate_options_name_their_target():
     nav = {k: v["what"] for k, v in crit.items() if k.startswith("navigate:")}
     check("a navigate option exists for the far chest", nav, str(sorted(crit)))
     check("its text names the chest and its bands",
-          any("small chest (cheap, far)" in t for t in nav.values()), str(nav))
+          any("small chest (affordable, far)" in t for t in nav.values()), str(nav))
     check("and says nothing is used on arrival",
           all("nothing is used or started" in t for t in nav.values()), str(nav))
 

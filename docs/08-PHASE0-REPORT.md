@@ -167,6 +167,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F38 | **The roll is spent on cooldown**, so big telegraphed hits (Titan fist, Golem laser) land | open — mod reflex (dodge on wind-up) + JEV policy (save / use freely) |
 | F39 | **JEV could not choose to fight**, and had no idea how the game is played | **fixed** — `fight_nearby` option; `game` primer in every request |
 | F40 | **Identical walk options split JEV's vote below the gate**; equipment barrels, terminals, barrels, drones had no action | **fixed** — one walk per kind; four new verbs; chest-priority fact in the primer |
+| F41 | **Category chests were one kind** (Damage/Healing/Utility indistinguishable), and cost read 'expensive' against a fixed 25 gold | **fixed** — six variant kinds that say what they guarantee; cost banded against gold on hand |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1260,6 +1261,23 @@ with an enemy within 30 m (fighting lingered on stragglers); and the person runn
 priority as a primer fact -- healthy with few enemies near, an affordable chest is usually the
 best use of time. Re-asking 8 of jev-03's healthy / can-afford / quiet ticks: chest walk 6,
 equipment barrel 1, fight 1, all above the gate (0.50-0.98).
+
+
+### F41 — The chest variants were sent, then flattened
+
+jev-04: the character went to chests between fights, but the person watching saw it ignore the
+Damage, Healing and Utility chests. The mod sent all three every frame (`CategoryChestDamage`,
+`...Healing`, `...Utility`, 30 gold). The prefab table mapped all three to one `chest_category`, so
+the option read "category chest" without saying what it gives, and F40's one-walk-per-kind then
+offered only one of the three; JEV gave it 0.0. Separately, cost bands were `cheap` below a fixed
+25 gold, so a 30-gold chest read `expensive` while the character could pay for it.
+
+Fixed: six kinds (`chest_damage`, `chest_healing`, `chest_utility`, and `_large` for
+`CategoryChest2*`) labelled with what they guarantee ("damage chest (always a damage item)");
+`cost_band` is `affordable` / `unaffordable` against gold on hand, `free`, or the currency for
+non-gold costs. Re-asking 5 of jev-04's ticks with an affordable variant: the variants now draw
+0.09-0.22; JEV still mostly prefers the cheaper small chest, with `build.identity` undefined
+(Bustling Fungus, Medkit) -- a defensible call.
 
 ---
 
