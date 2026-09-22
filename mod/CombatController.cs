@@ -480,8 +480,7 @@ namespace Rainflayer
 
         /// <summary>
         /// True if there is ground under every probe point along <paramref name="dir"/> out to
-        /// <paramref name="distance"/>. Same ray as build 1's roam check: from 2 m above the
-        /// point, 5 m down, World layer.
+        /// <paramref name="distance"/> (see GroundBelow).
         /// </summary>
         private static bool GroundAlong(Vector3 from, Vector3 dir, float distance)
         {
@@ -489,14 +488,21 @@ namespace Rainflayer
             if (dir.sqrMagnitude < 1e-4f)
                 return true;
             dir.Normalize();
-            int world = LayerMask.GetMask("World");
             for (float d = EDGE_PROBE_STEP_M; d <= distance + 0.01f; d += EDGE_PROBE_STEP_M)
-            {
-                Vector3 p = from + dir * d + Vector3.up * 2f;
-                if (!Physics.Raycast(p, Vector3.down, 5f, world))
+                if (!GroundBelow(from + dir * d))
                     return false;
-            }
             return true;
+        }
+
+        /// <summary>
+        /// Ground within 3 m below <paramref name="point"/>'s height. The ray starts 4 m above
+        /// the point: build 1 started it at 2 m, so ground rising more than that (stairs, the rim
+        /// of a sunken area) put the origin inside the terrain, the ray hit nothing, and the
+        /// step read as a cliff. The reach below is unchanged, so real drops still stop it.
+        /// </summary>
+        private static bool GroundBelow(Vector3 point)
+        {
+            return Physics.Raycast(point + Vector3.up * 4f, Vector3.down, 7f, LayerMask.GetMask("World"));
         }
 
         /// <summary>
@@ -878,10 +884,19 @@ namespace Rainflayer
 
             // Check for cliffs
             Vector3 groundCheckPos = playerPos + directionToWaypoint.normalized * 3f;
-            bool groundAhead = Physics.Raycast(groundCheckPos + Vector3.up * 2f, Vector3.down, 5f, LayerMask.GetMask("World"));
+            bool groundAhead = GroundBelow(groundCheckPos);
 
-            // If obstacle or cliff, pick new waypoint
-            if (obstacleAhead || !groundAhead)
+            // ROR-JEV (build 5): only a CLIFF stops the character. Build 1 stopped on the
+            // eye-level obstacle ray too, and that ray hits stair steps and the rim of a sunken
+            // area -- the character froze there. An obstacle now just re-picks the waypoint and
+            // keeps moving through ApplyJumpDetection, as before build 1.
+            if (obstacleAhead && groundAhead)
+            {
+                roamWaypoint = null;
+                body.inputBank.moveVector = controller.GetNavigationController()
+                    .ApplyJumpDetection(body, directionToWaypoint.normalized);
+            }
+            else if (!groundAhead)
             {
                 // ROR-JEV fix 1 (edge loop): actually STOP. RainflayerPlugin's input override
                 // saves and restores inputBank.moveVector every frame, so a branch that sets no

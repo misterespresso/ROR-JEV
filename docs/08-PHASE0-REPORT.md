@@ -1141,6 +1141,15 @@ and, if the heading is unsafe, takes the first safe detour at ±45°, ±90°, ±
 still. The utility skill is skipped unless ground runs the whole way to 12 m in the direction it
 will go (move vector, or aim if standing). Both log `[EDGE]` lines (≤ 1/s) to the BepInEx log.
 
+**Build 1 was too strict, and build 5 corrects it.** In fork-08 (still build 4) the person
+watching saw roaming stall on stairs and in sunken areas. Two causes in build 1's roam check:
+the eye-level obstacle ray hits stair steps and rims, and build 1 made that case stop dead like a
+cliff; and the ground ray started only 2 m above the probe point, so ground rising more than 2 m
+within 3 m put the ray's origin inside the terrain and read as a cliff. Build 5 stops only for
+cliffs (an obstacle re-picks the waypoint and keeps moving through `ApplyJumpDetection`), and
+`GroundBelow` starts the ray 4 m up with the same 3 m reach below, shared by roam, combat
+movement and the dash check.
+
 The same run is the first real evidence for builds 2 and 4: every fall registered as
 environmental damage, and the threat block classified every body it saw (Beetle, Lemurian,
 Golem). `engage_range` was sendable on 13 of 18 ticks.
