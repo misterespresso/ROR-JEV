@@ -30,7 +30,8 @@ from dataclasses import dataclass, field
 from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
 from .enemy_class import band_threat
-from .interactable_type import REGISTRY_TYPE, classify as classify_prefab
+from .interactable_type import REGISTRY_TYPE, classify as classify_prefab, shop_item_name
+from .build_identity import describe_item
 
 #: Every place this adapter is making something up rather than reading it. Kept as data so
 #: a replay report can print it, because a reader who does not know these is being misled.
@@ -354,8 +355,10 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
             eid = f"{t}@{it.get('id')}"          # `@` marks a real instance ID (stock_bridge)
             in_range = dist is not None and dist <= range_m
             cost = num(it.get("cost"), 0)
+            item = shop_item_name(it.get("shop_item")) if "shop_hidden" in it else None
             ilist.append({
-                "entity_id": eid, "type": rtype, "display_name": it.get("display"),
+                "entity_id": eid, "type": rtype, "kind": t, "display_name": it.get("display"),
+                "item": item, "item_hidden": bool(it.get("shop_hidden")),
                 "cost": cost, "cost_type": COST_TYPES.get(str(it.get("cost_type")),
                                                         str(it.get("cost_type")).lower()),
                 "locked": False, "distance": dist, "in_interaction_range": in_range,
@@ -364,6 +367,8 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                 "path_reachable": True, "reachability_age_ms": UNKNOWN,
             })
             cands.append({"id": eid, "type": rtype, "kind": t,
+                          **({"item": describe_item(item, bool(it.get("shop_hidden")))}
+                             if "shop_hidden" in it else {}),
                           "cost_band": "cheap" if (cost or 0) <= 25 else "expensive",
                           "distance_band": _nearest_band(dist), "reachable": True})
 
@@ -376,6 +381,9 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         "interactables": ilist,
         "threat": {"enemies": [],
                    "enemy_count": num(combat.get("enemy_count"), 0) if combat else 0,
+                   "nearest_enemy_m": (None if not combat or num(combat.get(
+                       "nearest_enemy_distance")) in (None, NO_ENEMY_SENTINEL)
+                       else num(combat.get("nearest_enemy_distance"))),
                    "boss_active": bool(objective.get("boss_active"))
                    if objective else False,
                    # Not measured by stock, and not guessable. The pathfinder owns these.

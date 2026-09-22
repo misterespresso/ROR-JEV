@@ -27,6 +27,7 @@ game_primer:
   - "Starting the teleporter summons a boss and many extra enemies, and it cannot be undone. The character must then stay inside the teleporter zone until it is fully charged."
   - "A strong stage: fight the enemies nearby, open the chests the character can afford, then start the teleporter once the character is strong enough to beat a boss."
   - "A fight that is going well is worth finishing. Walking away from damaged enemies throws away the damage already dealt."
+  - "When health is full and few enemies are near, opening an affordable chest is usually the best use of time: items are the main way to get stronger besides levelling up."
 
 questions:
 
@@ -209,6 +210,17 @@ payload:
         not_for: "Stages where the teleporter is already found."
       explore:
         what: "Move through unexplored parts of the stage looking for anything useful."
+      open_barrel:                                 # jev-03
+        what: "Open the barrel you are standing at. Free; gives a little gold and experience."
+      open_equipment_barrel:                       # jev-03
+        what: "Open the equipment barrel you are standing at. Spends gold; gives a random equipment item, which replaces any equipment carried."
+        not_for: "When the gold is needed for a chest."
+      buy_from_terminal:                           # jev-03
+        what: "Buy {item} from the shop terminal you are standing at. Spends gold; the item is known before paying."
+        not_for: "An item that does not fit `build.identity`, or an unknown item when a chest is affordable."
+      repair_drone:                                # jev-03
+        what: "Repair the broken drone you are standing at. Spends gold; it then fights alongside the character."
+        not_for: "When the gold is needed for a chest."
       fight_nearby:                                # jev-02
         what: "Stay and fight the enemies nearby until they are dead. Kills give gold and experience."
         not_for: "Health too low to keep trading hits, or an enemy group too strong to win against."

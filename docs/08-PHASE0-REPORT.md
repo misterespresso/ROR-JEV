@@ -166,6 +166,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F37 | JEV loop held a task past a phase change; 30 s cut long walks | **fixed** — release on objective change; walks get 60 s |
 | F38 | **The roll is spent on cooldown**, so big telegraphed hits (Titan fist, Golem laser) land | open — mod reflex (dodge on wind-up) + JEV policy (save / use freely) |
 | F39 | **JEV could not choose to fight**, and had no idea how the game is played | **fixed** — `fight_nearby` option; `game` primer in every request |
+| F40 | **Identical walk options split JEV's vote below the gate**; equipment barrels, terminals, barrels, drones had no action | **fixed** — one walk per kind; four new verbs; chest-priority fact in the primer |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1239,6 +1240,26 @@ sent as `state.game` in every request, referenced by `next_action`'s instruction
 jev-02's own ticks: with few or several enemies at close/mid range, JEV now picks `fight_nearby`
 at 0.92-0.95 (was `navigate:teleporter` ~0.8-0.9); quiet and broke, `explore` 0.36-0.47 (was
 the teleporter ~0.8).
+
+
+### F40 — JEV wanted chests, and identical options split its vote
+
+jev-03 (build 9 + F39): the character stayed in fights until won, but near affordable chests it
+kept walking to the teleporter, and equipment barrels and a shop terminal next to the teleporter
+were ignored. The recording: `navigate` chosen 51 times, **30 refused by the 0.40 gate** -- on
+those ticks the summed probability over chest walks was 0.62-0.95 while no single option cleared
+0.40, because up to four options read identically ("small chest (cheap, far)"). The teleporter,
+unique of its kind, was never split. And equipment barrels, terminals, barrels and drones were
+visible since build 6 but had no verb.
+
+Fixed, brain side: walking is offered to the nearest target of each kind only (merges recorded in
+`dropped` with `merged_into_kind`); verbs `open_barrel`, `open_equipment_barrel`,
+`buy_from_terminal` (option text names the item: "a white healing item (HealWhileSafe)") and
+`repair_drone` (drones and turrets), all through the existing `INTERACT_ID`; `fight_nearby` only
+with an enemy within 30 m (fighting lingered on stragglers); and the person running the project's
+priority as a primer fact -- healthy with few enemies near, an affordable chest is usually the
+best use of time. Re-asking 8 of jev-03's healthy / can-afford / quiet ticks: chest walk 6,
+equipment barrel 1, fight 1, all above the gate (0.50-0.98).
 
 ---
 

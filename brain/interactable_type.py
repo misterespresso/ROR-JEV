@@ -68,6 +68,12 @@ REGISTRY_TYPE: dict[str, str] = {
     "chest_category": "chest",
     "shrine_chance": "shrine_chance",
     "shrine_blood": "shrine_blood",
+    # jev-03
+    "barrel": "barrel",
+    "equipment_barrel": "equipment_barrel",
+    "shop_terminal": "shop_terminal",
+    "drone": "drone",
+    "turret": "drone",
 }
 
 

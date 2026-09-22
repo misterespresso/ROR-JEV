@@ -10,7 +10,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 |---|---|
 | Phase 0 go/no-go | **passed** — stock Rainflayer 1.1.1 runs on the pinned game build (Thunderstore package 1.1.1; its DLL declares plugin version 1.1.0, hence `mod/stock/Rainflayer-1.1.0.dll` — see `contract/pinned-build.yaml`) |
 | Recordings | ~3.5 h across 5 survivors, all 3 objective phases, stage 4 reached (`recordings/`, gitignored) |
-| Brain | contract implemented; **319 tests passing** (`python -m eval.run_suite`) |
+| Brain | contract implemented; **323 tests passing** (`python -m eval.run_suite`) |
 | Brain on real telemetry | stock recordings: **zero questions sendable** (F18). fork-06 (build 2): **`next_action` sendable on 444/448 ticks** (the other 4: 3 dead, 1 no observation) and `worth_start_teleporter` on 6; the rest blocked on `threat` sub-fields |
 | Fork | `mod/`, based on upstream `01137e5`, BepInEx 5, builds reproducibly from a clone |
 | Deployed | **build 9** `CCA56F5A…` (`python tools/deploy.py --status`) |
@@ -135,7 +135,9 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    because a `navigate` pick started the teleporter JEV had judged not worth it (F35, the bridge's
    fault -- fixed); F36/F37 fixed too. Run it again: `python -m eval.jev_run --run-id jev-02 ...`.
    jev-02: oscillated teleporter <-> fight because fighting was not an option (F39, fixed brain
-   side: `fight_nearby` + `game_primer`). Next run: jev-03. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
+   side: `fight_nearby` + `game_primer`). jev-03: fights won, but identical chest walks split
+   JEV's vote below the gate and terminals/equipment barrels had no action (F40, fixed brain
+   side). Next run: jev-04. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
    Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
    request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
    → the game. `--dry-run` asks JEV and sends nothing. Records `JEV_EXCHANGE` (request, answers,

@@ -143,6 +143,18 @@ ITEMS: dict[str, tuple[str, str]] = {
 }
 
 
+def describe_item(name: str | None, hidden: bool = False) -> str:
+    """How a shop item reads to JEV: tier and role from the table, then the internal name.
+    Hidden (the "?" terminal) or unrecognised items say so rather than guess."""
+    if hidden or not name:
+        return "an unknown item (hidden)"
+    entry = ITEMS.get(name)
+    if entry is None:
+        return f"an unrecognised item ({name})"
+    tier, tag = entry
+    return f"a {tier} {tag.replace('_', ' ')} item ({name})"
+
+
 def derive(items: list[dict]) -> str:
     """`build.identity` for one inventory (hidden items already removed by the caller)."""
     weight: Counter[str] = Counter()

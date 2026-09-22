@@ -360,10 +360,11 @@ def trace_f2_fight_boss_from_threat_list():
                   for k in build_registry(raw2, set(CAPS) | {"fight_target"}, False)))
 
 
-def _many(n, in_range_at=3):
+def _many(n, in_range_at=3, same_kind=False):
     raw = copy.deepcopy(RAW_BASE)
     raw["interactables"] = [
         {"entity_id": f"e{i:02d}", "type": "chest", "display_name": "Chest", "cost": 25,
+         "kind": "chest_small" if same_kind else f"kind{i:02d}",
          "cost_type": "gold", "locked": False, "distance": float(60 - i),
          "in_interaction_range": (i == in_range_at),
          "opportunity_token": "opp-x" if i == in_range_at else None,
@@ -395,6 +396,18 @@ def trace_f1_cap_and_ranking():
           "e29" in kept and "e00" not in kept, str(sorted(kept)))
     check("under the cap, nothing is dropped",
           build_registry(_many(5), set(CAPS), False, (d5 := [])) is not None and not d5)
+
+    # jev-03: identical walk options split JEV's vote below the gate. One per kind.
+    dm = []
+    regm = build_registry(_many(30, same_kind=True), set(CAPS), False, dm)
+    walks = [k for k in regm if k.startswith("navigate:")]
+    check("30 same-kind targets -> one walk option, the nearest",
+          walks == ["navigate:e29"], str(walks))
+    check("the in-range one is still offered as itself",
+          any(k.startswith("open_chest:e03") for k in regm), str(sorted(regm)))
+    check("merged walks are recorded, with the kind they merged into",
+          len(dm) == 28 and all(d.get("merged_into_kind") == "chest_small" for d in dm),
+          f"{len(dm)} recorded")
 
 
 
@@ -757,9 +770,12 @@ def trace_full_interactables():
     check("stock's cone chest is replaced; its teleporter is kept",
           any(i.startswith("teleporter") for i in ids) and "chest-0" not in ids, str(ids))
     check("the chest carries the game's instance ID", "chest_small@111" in ids, str(ids))
-    check("barrel, drone and terminal are visible but not offered",
-          sorted(ad.visible_no_verb) == ["barrel", "drone", "shop_terminal"],
-          str(ad.visible_no_verb))
+    check("jev-03: barrel, drone and terminal now reach the registry",
+          ad.visible_no_verb == [] and {"barrel", "drone", "shop_terminal"}
+          <= {i["type"] for i in ad.raw["interactables"]}, str(ad.visible_no_verb))
+    term = next(c for c in ad.banded["economy"]["candidates"] if c["type"] == "shop_terminal")
+    check("the terminal's item reads with tier and role",
+          term.get("item") == "a white damage item (Crowbar)", str(term))
     check("the unknown prefab is reported, not guessed", ad.unmapped == ["prefab:MysteryThing"])
 
     reg = build_registry(ad.raw, set(CAPS), False)

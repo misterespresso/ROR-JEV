@@ -23,6 +23,11 @@ VERBS = {
     "search_teleporter": ("SEARCH",          "reversible",   False, False, "search"),
     "explore":           ("SEARCH",          "reversible",   False, False, "search"),
     "fight_nearby":      ("ENGAGE_NEARBY",   "reversible",   False, False, "fight_nearby"),
+    # jev-03: visible since build 6, never offerable. INTERACT_ID already opens any of them.
+    "open_barrel":            ("INTERACT_TARGET", "reversible", True, False, "interact_target"),
+    "open_equipment_barrel":  ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
+    "buy_from_terminal":      ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
+    "repair_drone":           ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
 }
 
 #: Which verb an interactable type offers. Range gating is applied afterwards, per verb,
@@ -36,7 +41,15 @@ TYPE_TO_VERB = {
     "teleporter_idle": "start_teleporter",
     "teleporter_charging": "defend_zone",
     "teleporter_charged": "advance_stage",
+    "barrel": "open_barrel",
+    "equipment_barrel": "open_equipment_barrel",
+    "shop_terminal": "buy_from_terminal",
+    "drone": "repair_drone",
 }
+
+#: A fight is worth offering only when an enemy is this close (jev-03: offered for any enemy
+#: within stock's 50 m, fighting lingered on stragglers).
+FIGHT_NEARBY_MAX_M = 30.0
 
 #: Enemy classes worth a dedicated `fight_boss` record. Built from `threat.enemies`, not
 #: from interactables -- an enemy is not an interactable and never appears in that list.
@@ -162,6 +175,24 @@ def build_registry(
                 "in_interaction_range": False}))
 
     candidates.sort(key=_rank)
+    # jev-03: four "walk to the small chest (cheap, far)" options split JEV's vote -- summed
+    # chest-walk probability reached 0.62-0.95 while no single option cleared the 0.40 gate,
+    # 30 times. Walking is offered to the NEAREST of each kind only; options JEV cannot tell
+    # apart must not divide its choice. In-range actions are never merged.
+    seen_walk: set[str] = set()
+    kept = []
+    for c in candidates:
+        _aid, rec, it = c
+        if rec.verb == "navigate":
+            kind = str(it.get("kind") or it.get("type"))
+            if kind in seen_walk:
+                if dropped is not None:
+                    dropped.append({"action_id": _aid, "rank": None, "merged_into_kind": kind,
+                                    "distance": it.get("distance")})
+                continue
+            seen_walk.add(kind)
+        kept.append(c)
+    candidates = kept
     for aid, rec, it in candidates[:MAX_ENTITY_ACTIONS]:
         reg[aid] = rec
     if dropped is not None:
@@ -184,7 +215,9 @@ def build_registry(
     # jev-02: with enemies close and the teleporter judged not worth starting, JEV's only
     # options were walking somewhere -- it chose the teleporter 84 times in 91 while the mod's
     # own combat dragged the character back and forth. Fighting has to be choosable.
-    if "fight_nearby" in capabilities and (obs.get("threat", {}).get("enemy_count") or 0) > 0:
+    nearest = obs.get("threat", {}).get("nearest_enemy_m")
+    if ("fight_nearby" in capabilities and (obs.get("threat", {}).get("enemy_count") or 0) > 0
+            and nearest is not None and nearest <= FIGHT_NEARBY_MAX_M):
         reg["fight_nearby"] = ActionRecord(
             "fight_nearby", "fight_nearby", "ENGAGE_NEARBY", {}, phase, "reversible",
             "fight_nearby")

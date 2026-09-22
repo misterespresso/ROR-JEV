@@ -186,18 +186,23 @@ def _option_vars(rec: ActionRecord, state: dict) -> dict:
     distance bands, e.g. "the small chest (cheap, close)" -- so options differ by more than
     their keys.
     """
-    band, target = UNKNOWN, "this target"
+    band, target, item = UNKNOWN, "this target", "the item on offer"
     tid = rec.args.get("target_id")
     for cand in state.get("economy", {}).get("candidates", []):
         if cand.get("id") == tid:
             band = cand.get("cost_band", UNKNOWN)
             kind = label(str(cand.get("kind") or cand.get("type", "target")))
             dist = cand.get("distance_band", UNKNOWN)
+            if cand.get("item"):
+                item = cand["item"]
             if kind.startswith("teleporter"):
                 target = f"the teleporter ({dist})"
+            elif cand.get("item"):
+                target = f"the {kind} selling {item} ({band}, {dist})"
             else:
                 target = f"the {kind} ({band}, {dist})"
-    return {"cost_band": band, "entity_id": rec.args.get("target_id", ""), "target": target}
+    return {"cost_band": band, "entity_id": rec.args.get("target_id", ""), "target": target,
+            "item": item}
 
 
 def _render_worth_gates(payload: dict, registry: dict[str, ActionRecord]) -> dict:

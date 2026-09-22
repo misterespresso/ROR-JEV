@@ -80,6 +80,30 @@ verbs:
     range_gated: false
     requires_worth_gate: false
     capability: fight_nearby
+  open_barrel:
+    command: INTERACT_TARGET
+    commitment: reversible
+    range_gated: true
+    requires_worth_gate: false
+    capability: interact_target
+  open_equipment_barrel:
+    command: INTERACT_TARGET
+    commitment: costly
+    range_gated: true
+    requires_worth_gate: false
+    capability: interact_target
+  buy_from_terminal:
+    command: INTERACT_TARGET
+    commitment: costly
+    range_gated: true
+    requires_worth_gate: false
+    capability: interact_target
+  repair_drone:
+    command: INTERACT_TARGET
+    commitment: costly
+    range_gated: true
+    requires_worth_gate: false
+    capability: interact_target
 
 sentinels:
   none: { serializes: false, capability_exempt: true }
@@ -93,3 +117,7 @@ type_to_verb:
   teleporter_idle: start_teleporter
   teleporter_charging: defend_zone
   teleporter_charged: advance_stage
+  barrel: open_barrel
+  equipment_barrel: open_equipment_barrel
+  shop_terminal: buy_from_terminal
+  drone: repair_drone
