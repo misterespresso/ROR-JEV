@@ -33,7 +33,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 | 9 | `GOTO_ID <id\|teleporter>`: navigate walks and stops (F35) | **deployed** `CCA56F5A…` from `993d86b`; not yet run |
 | 10 | Pickup reflex (F42); `self.equipment` readiness + `USE_EQUIPMENT` (F43) | **yes** — jev-06 (and exposed F44) |
 | 11 | Hold still at a `GOTO_ID` destination (F44) | **yes** — jev-07 (exposed F45) |
-| 12 | Combat target lock; clear-shot line of sight (F45) | **deployed** `C36AC0A4…` from `2407887`; not yet run |
+| 12 | Combat target lock; clear-shot line of sight (F45) | **yes** — jev-08: target thrash and wall shots gone |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -143,7 +143,7 @@ movement fault; whether to start the teleporter then is the call `worth_start_te
    side). jev-04: chests between fights; variant chests flattened (F41, fixed). Walks past
    barrels (accepted). jev-05: items left on the ground (F42), equipment never used (F43) --
    both fixed in build 10. jev-06: arrive-drift-return and no mid-walk change of mind (F44, fixed; build 11).
-   jev-07: combat target thrash, shots into walls (F45, fixed; build 12). Next: run jev-08. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
+   jev-07: combat target thrash, shots into walls (F45, fixed; build 12). jev-08: good. Open: F34 (target priority as JEV's), F38 (save the roll), path feasibility. Then F38 (dodges). Original notes: `python -m eval.jev_run --run-id jev-01 --survivor
    Commando --difficulty Drizzle` (needs build 8 deployed). Every 2 s: poll → adapter → registry →
    request → JEV (`brain/jev_client.py`, key from `JEV_KEY`) → dispatcher → `brain/stock_bridge.py`
    → the game. `--dry-run` asks JEV and sends nothing. Records `JEV_EXCHANGE` (request, answers,
