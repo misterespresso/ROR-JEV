@@ -44,8 +44,10 @@ from eval.record_run import RunState, poll
 #: Documented price (docs/01-RESEARCH.md): $0.042 per million input tokens, output free.
 USD_PER_INPUT_TOKEN = 0.042 / 1_000_000
 
-#: A task the mod never reports on is released after this long (F25).
-TASK_TIMEOUT_S = 30.0
+#: A task the mod never reports on is released after this long (F25): walks get the
+#: contract's NAVIGATE_TARGET deadline, interactions less (jev-01: 30 s cut a long walk short).
+TASK_TIMEOUT_S = {"GOTO_ID": 60.0}
+TASK_TIMEOUT_DEFAULT_S = 30.0
 
 #: Back off this long after a rate-limit or overload answer.
 BACKOFF_S = {429: 5.0, 529: 5.0}
@@ -57,9 +59,11 @@ EVENT_STATE = {"action_started": State.NAVIGATING, "action_complete": State.COMP
 class Task:
     """What the loop knows about the one running task, beyond the Lifecycle slot."""
 
-    def __init__(self, command_id: str, label: str, target_iid: str | None, now: float):
+    def __init__(self, command_id: str, label: str, target_iid: str | None, now: float,
+                 objective: str, timeout_s: float):
         self.command_id, self.label, self.target_iid, self.since = (
             command_id, label, target_iid, now)
+        self.objective, self.timeout_s = objective, timeout_s
 
 
 def available_ids(observation: dict | None) -> set[str] | None:
@@ -162,8 +166,12 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             why = None
             if task.target_iid and ids is not None and task.target_iid not in ids:
                 why, state = "target no longer available (used)", State.COMPLETED
-            elif now - task.since > TASK_TIMEOUT_S:
-                why, state = f"no outcome within {TASK_TIMEOUT_S:g}s", State.FAILED
+            elif st.objective != task.objective:
+                # F37: starting the teleporter sends no terminal event, so jev-01 held the slot
+                # 13 s into the charge before defend_zone could be chosen.
+                why, state = f"objective changed {task.objective} -> {st.objective}", State.COMPLETED
+            elif now - task.since > task.timeout_s:
+                why, state = f"no outcome within {task.timeout_s:g}s", State.FAILED
             if why:
                 life.on_event(task.command_id, state, why)
                 rec.record({"type": "HARNESS_NOTE", "note": "task_released",
@@ -212,6 +220,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
         for cmd in d.commands:
             mc = to_mod(cmd)
             if mc is None:
+                if cmd.command == "SET_POSTURE":
+                    continue            # engage_range alone: the fork has no command for it
                 rec.record({"type": "HARNESS_NOTE", "note": "unsupported_command",
                             "command": cmd.command, "args": cmd.args})
                 if life.task and life.task.command_id == cmd.command_id:
@@ -230,7 +240,8 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                 if mc.holds_slot and not a.dry_run:
                     life.on_event(cmd.command_id, State.ACCEPTED)
                     iid = mc.args if mc.command == "INTERACT_ID" else None
-                    task = Task(cmd.command_id, mc.label, iid, now)
+                    task = Task(cmd.command_id, mc.label, iid, now, st.objective,
+                                TASK_TIMEOUT_S.get(mc.command, TASK_TIMEOUT_DEFAULT_S))
                 else:
                     # A standing MODE, or a dry run: nothing will end it, so free the slot now
                     # and let JEV re-decide next tick.

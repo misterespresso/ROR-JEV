@@ -254,14 +254,17 @@ class Adapted:
     visible_no_verb: list[str] = field(default_factory=list)
 
 
-def _gold_band(gold: int | None) -> str:
-    # Banding needs a reference price to be meaningful. Without one this is the honest
-    # minimum: whether there is any money at all.
+def _gold_band(gold: int | None, prices: list[int] | None = None) -> str:
+    """Gold against the cheapest gold-priced thing on offer, so JEV can tell whether it can
+    pay (jev-01: "has_gold" said nothing about a 25-gold chest). Without prices, the honest
+    minimum: whether there is any money at all."""
     if gold is None:
         return UNKNOWN
-    if gold <= 0:
-        return "broke"
-    return "has_gold"
+    prices = [c for c in (prices or []) if c and c > 0]
+    if not prices:
+        return "broke" if gold <= 0 else "has_gold"
+    n = gold // min(prices)
+    return "cannot_afford" if n == 0 else "can_afford_one" if n == 1 else "can_afford_several"
 
 
 def _enemies_band(count: int | None) -> str:
@@ -360,7 +363,7 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                 "opportunity_token": f"synthetic-{eid}" if in_range else None,
                 "path_reachable": True, "reachability_age_ms": UNKNOWN,
             })
-            cands.append({"id": eid, "type": rtype,
+            cands.append({"id": eid, "type": rtype, "kind": t,
                           "cost_band": "cheap" if (cost or 0) <= 25 else "expensive",
                           "distance_band": _nearest_band(dist), "reachable": True})
 
@@ -399,7 +402,9 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                    "reposition_feasible": UNKNOWN,
                    "full_withdrawal_feasible": UNKNOWN},
         "hazards": UNKNOWN,
-        "economy": {"gold_band": _gold_band(gold), "candidates": cands},
+        "economy": {"gold_band": _gold_band(gold, [i["cost"] for i in ilist
+                                                   if i.get("cost_type") == "gold"]),
+                    "candidates": cands},
         "objective": {"phase": phase, "teleporter_found": tp_found,
                       "teleporter_charge_band": (
                           "complete" if stock_phase == "teleporter_charged"

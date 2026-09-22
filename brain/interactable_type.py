@@ -45,6 +45,21 @@ RULES: list[tuple[str, str]] = [
 
 _COMPILED = [(re.compile(p), t) for p, t in RULES]
 
+#: How a type reads in option text (F36). Types not listed read as their name with spaces.
+LABELS: dict[str, str] = {
+    "chest_small": "small chest", "chest_large": "large chest",
+    "chest_legendary": "legendary chest", "chest_category": "category chest",
+    "chest_adaptive": "adaptive chest", "shrine_chance": "Shrine of Chance",
+    "shrine_blood": "Shrine of Blood", "barrel": "barrel", "drone": "broken drone",
+    "turret": "broken turret", "printer": "printer", "shop_terminal": "shop terminal",
+    "lunar_pod": "lunar pod", "newt_altar": "newt altar",
+}
+
+
+def label(kind: str) -> str:
+    return LABELS.get(kind, kind.replace("_", " "))
+
+
 #: Types the registry can act on today, and the registry type each becomes.
 REGISTRY_TYPE: dict[str, str] = {
     "chest_small": "chest",

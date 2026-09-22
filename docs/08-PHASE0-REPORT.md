@@ -161,6 +161,10 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F32 | `next_action` is sent on ticks where the character is dead (`hp_band: dead`, fork-06: 3 ticks) | **fixed** — `build_request` asks nothing when `self.hp_band` is `dead` |
 | F33 | **Combat movement walks and rolls off cliffs**: backing away and the utility dash have no edge check | **fixed in fork build 5** — not yet verified in game |
 | F34 | **Combat target choice is fixed in the mod, not JEV's**: boss +50 wins, then sticks | open — needs a target-priority channel and readable item effects |
+| F35 | **`navigate` executed an interaction**: walking to the teleporter started it, past JEV's "not worth it" | **fixed in build 9** — `GOTO_ID` walks only |
+| F36 | **`navigate` options were indistinguishable** except by key; `gold_band` could not say "can afford" | **fixed** — options name target, cost and distance bands; gold banded against prices |
+| F37 | JEV loop held a task past a phase change; 30 s cut long walks | **fixed** — release on objective change; walks get 60 s |
+| F38 | **The roll is spent on cooldown**, so big telegraphed hits (Titan fist, Golem laser) land | open — mod reflex (dodge on wind-up) + JEV policy (save / use freely) |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1175,6 +1179,47 @@ The person running the project frames the wider need as micro-tactics: the goal 
 every few seconds as the fight changes. That is the per-tick design already -- one fan-out call
 per tick -- so a `target_priority` question is re-asked every tick like the others; nothing
 needs to hold a target once JEV stops choosing it.
+
+
+### F35 — A "navigate" pick started the teleporter JEV had judged not worth starting
+
+jev-01, the first run JEV drove (build 8, Commando, Drizzle, Titanic Plains): JEV chose
+`navigate:teleporter` on almost every tick (p ≈ 0.9). `brain/stock_bridge.py` mapped
+`NAVIGATE_TARGET` for the teleporter to the mod's `FIND_AND_INTERACT teleporter` -- which presses
+the button on arrival. At 45 s and 47 s JEV had been asked `worth_start_teleporter` directly and
+answered **0.26 and 0.24** (not worth it; the gate authorises above 0.75). The walk started it at
+~48 s anyway, at level 1 with no items; a boss and 12 enemies killed the character at 80 s. The
+same mapping would have opened a chest on arrival for an `INTERACT_ID` navigate. This was the
+translation layer's fault, not JEV's: the reversible action executed an irreversible effect,
+bypassing the worth gate. **Fixed in build 9:** `GOTO_ID <id|teleporter>` walks and stops, with its
+own `action_complete`; `NAVIGATE_TARGET` maps only to it, and only `INTERACT_TARGET` -- reached
+through the dispatcher's probability and worth gates -- maps to an interaction.
+
+### F36 — JEV could not tell its navigate options apart
+
+Every `navigate:*` option carried the same text ("Travel to this target so it can be interacted
+with on arrival"), so a cheap nearby chest and the teleporter differed only by key. And
+`gold_band` was `has_gold` / `broke`, so nothing said whether a chest was affordable. Now the text
+names the target ("Walk to the small chest (cheap, far). Only walking: ...") and gold is banded
+against the cheapest gold price on offer (`cannot_afford` / `can_afford_one` /
+`can_afford_several`). Re-asking the same fork-11 tick: JEV still chose the teleporter (0.93),
+now knowing it could afford several chests. That is JEV's call; with F35 fixed it only walks there.
+
+### F37 — Loop bookkeeping in jev-01
+
+Starting the teleporter sends no terminal event (F25 again), so the slot was held until the 30 s
+timeout, 13 s into the charge, before `defend_zone` could be chosen; and 30 s was shorter than the
+first walk. The loop now releases a task when the objective phase changes, walks get the
+contract's 60 s, and `engage_range`-only posture (no fork command) is no longer logged as
+unsupported every tick.
+
+### F38 — The roll is spent on cooldown, not saved for the hit
+
+Watching JEV runs: the mod fires the utility whenever it is ready and an enemy is within 20 m,
+so it is usually on cooldown when a Titan's fist or a Golem's laser -- telegraphed attacks --
+lands. JEV cannot time a dodge (a decision every 2 s, ~550 ms per answer), so the split is:
+the mod dodges as a reflex when a nearby enemy is winding up a heavy attack (its entity state is
+readable), and JEV sets the policy per tick (save dodges vs use freely). Open.
 
 ---
 

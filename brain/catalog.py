@@ -26,6 +26,7 @@ from typing import Any
 
 import yaml
 
+from .interactable_type import label
 from .registry import ActionRecord, SENTINELS
 
 CONTRACT = Path(__file__).resolve().parents[1] / "contract" / "questions.yaml"
@@ -179,12 +180,24 @@ def _render_next_action(
 
 
 def _option_vars(rec: ActionRecord, state: dict) -> dict:
-    """Substitution variables available to option text. Bands only, never numbers."""
-    band = UNKNOWN
+    """Substitution variables available to option text. Bands only, never numbers.
+
+    `target` names what an option points at (F36): the candidate's type with its cost and
+    distance bands, e.g. "the small chest (cheap, close)" -- so options differ by more than
+    their keys.
+    """
+    band, target = UNKNOWN, "this target"
+    tid = rec.args.get("target_id")
     for cand in state.get("economy", {}).get("candidates", []):
-        if cand.get("id") == rec.args.get("target_id"):
+        if cand.get("id") == tid:
             band = cand.get("cost_band", UNKNOWN)
-    return {"cost_band": band, "entity_id": rec.args.get("target_id", "")}
+            kind = label(str(cand.get("kind") or cand.get("type", "target")))
+            dist = cand.get("distance_band", UNKNOWN)
+            if kind.startswith("teleporter"):
+                target = f"the teleporter ({dist})"
+            else:
+                target = f"the {kind} ({band}, {dist})"
+    return {"cost_band": band, "entity_id": rec.args.get("target_id", ""), "target": target}
 
 
 def _render_worth_gates(payload: dict, registry: dict[str, ActionRecord]) -> dict:

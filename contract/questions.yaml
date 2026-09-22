@@ -198,7 +198,9 @@ payload:
       explore:
         what: "Move through unexplored parts of the stage looking for anything useful."
       navigate:                                    # AUTHORED-IN-PHASE-0
-        what: "Travel to this target so it can be interacted with on arrival. Costs only time."
+        # F36: jev-01 chose navigate:teleporter at ~0.9 every tick; every navigate option had
+        # this same text, so only the key told a cheap nearby chest from the teleporter.
+        what: "Walk to {target}. Only walking: nothing is used or started on arrival. Costs only time."
         not_for: "Targets whose reward does not justify crossing the distance."
       use_shrine_blood:                            # AUTHORED-IN-PHASE-0
         what: "Pay health at the Shrine of Blood you are standing at. Spends health, gives gold."

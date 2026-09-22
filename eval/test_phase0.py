@@ -717,6 +717,12 @@ def trace_full_interactables():
           and ctype("MultiShopTerminal") == "shop_terminal")
     check("Chest1 is not Chest2", ctype("Chest1") == "chest_small" and ctype("Chest2") == "chest_large")
     check("unknown prefab stays unclassified", ctype("SomethingNew") is None)
+    from brain.stock_adapter import _gold_band
+    check("gold is banded against the cheapest price on offer",
+          (_gold_band(24, [25, 50]), _gold_band(30, [25]), _gold_band(60, [25]))
+          == ("cannot_afford", "can_afford_one", "can_afford_several"))
+    check("with no prices it stays has_gold / broke", (_gold_band(10), _gold_band(0))
+          == ("has_gold", "broke"))
     check("Unity's numbered copies match (fork-10)", ctype("NewtStatue (1)") == "newt_altar")
     from brain.interactable_type import shop_item_name
     from brain.build_identity import ITEMS as ITEM_TABLE

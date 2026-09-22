@@ -41,15 +41,24 @@ def instance_id(target_id: str) -> str | None:
 
 def to_mod(cmd: Command) -> ModCommand | None:
     c, a = cmd.command, cmd.args or {}
-    if c in ("INTERACT_TARGET", "NAVIGATE_TARGET"):
-        tid = str(a.get("target_id") or "")
+    tid = str(a.get("target_id") or "")
+    if c == "NAVIGATE_TARGET":
+        # F35: walking only. A navigate pick used to reach FIND_AND_INTERACT, which presses the
+        # button on arrival -- in jev-01 it started the teleporter JEV had just judged not worth
+        # starting (worth gate 0.24-0.26), and the run died.
+        if tid.startswith("teleporter"):
+            return ModCommand("GOTO_ID", "teleporter", True, "GOTO_ID:teleporter")
+        iid = instance_id(tid)
+        return ModCommand("GOTO_ID", iid, True, f"GOTO_ID:{iid}") if iid is not None else None
+    if c == "INTERACT_TARGET":
+        # Reached only through the dispatcher's probability and worth gates.
         if tid.startswith("teleporter"):
             return ModCommand("FIND_AND_INTERACT", "teleporter", True,
                               "FIND_AND_INTERACT:teleporter")
         iid = instance_id(tid)
         if iid is not None:
             return ModCommand("INTERACT_ID", iid, True, f"INTERACT_ID:{iid}")
-        # A stock-list target (no build-6 frame): the mod can only pick the nearest of a type.
+        # A stock-list target (no build-6 frame) in range: the nearest of its kind is it.
         kind = "chest" if tid.startswith("chest") else "shrine" if tid.startswith("shrine") else None
         return (ModCommand("FIND_AND_INTERACT", kind, True, f"FIND_AND_INTERACT:{kind}")
                 if kind else None)

@@ -116,7 +116,18 @@ def trace_bridge():
     m = to_mod(cmd("INTERACT_TARGET", target_id="barrel@-97000"))
     check("interact by ID", m and (m.command, m.args, m.holds_slot) == ("INTERACT_ID", "-97000", True))
     m = to_mod(cmd("NAVIGATE_TARGET", target_id="teleporter-0"))
-    check("teleporter goes through the mod's own finder",
+    check("F35: navigating to the teleporter only walks there",
+          m and (m.command, m.args) == ("GOTO_ID", "teleporter"), str(m))
+    m = to_mod(cmd("NAVIGATE_TARGET", target_id="chest_small@-96072"))
+    check("F35: navigating to a chest only walks there",
+          m and (m.command, m.args) == ("GOTO_ID", "-96072"), str(m))
+    check("F35: navigate never becomes an interaction, for any target",
+          all((to_mod(cmd("NAVIGATE_TARGET", target_id=t)) or m).command == "GOTO_ID"
+              for t in ("teleporter-3", "barrel@-1", "chest_small@-5")))
+    check("F35: a stock positional ID cannot be walked to, so it is not approximated",
+          to_mod(cmd("NAVIGATE_TARGET", target_id="chest-0")) is None)
+    m = to_mod(cmd("INTERACT_TARGET", target_id="teleporter-0"))
+    check("starting the teleporter (gated) still uses the mod's finder",
           m and (m.command, m.args) == ("FIND_AND_INTERACT", "teleporter"))
     m = to_mod(cmd("SEARCH", **{"for": "interactables"}))
     check("explore is a standing MODE that frees the slot",
@@ -142,6 +153,21 @@ def trace_loop_executes_the_pick():
                                     if f["type"] == "HARNESS_DECISION"))
 
 
+def trace_navigate_options_name_their_target():
+    print("\nF36: navigate options say what they point at")
+    asked: list = []
+    far = frames(True)
+    far["QUERY_OBSERVATION"]["interactables"]["items"][-1]["distance"] = 40.0   # out of range
+    run([far], pick="none", asked=asked)
+    crit = asked[0]["questions"]["next_action"]["criteria"]
+    nav = {k: v["what"] for k, v in crit.items() if k.startswith("navigate:")}
+    check("a navigate option exists for the far chest", nav, str(sorted(crit)))
+    check("its text names the chest and its bands",
+          any("small chest (cheap, far)" in t for t in nav.values()), str(nav))
+    check("and says nothing is used on arrival",
+          all("nothing is used or started" in t for t in nav.values()), str(nav))
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -151,7 +177,8 @@ def trace_dead_asks_nothing():
 
 
 if __name__ == "__main__":
-    for t in (trace_bridge, trace_loop_executes_the_pick, trace_dead_asks_nothing):
+    for t in (trace_bridge, trace_loop_executes_the_pick,
+              trace_navigate_options_name_their_target, trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

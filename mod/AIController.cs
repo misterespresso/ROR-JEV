@@ -284,7 +284,13 @@ namespace Rainflayer
                     // ROR-JEV (build 8): go to ONE object, named by the instance ID the
                     // OBSERVATION reported, and interact. What JEV picked, not the nearest.
                     case "INTERACT_ID":
-                        HandleInteractId(args);
+                        HandleInteractId(args, interact: true);
+                        break;
+
+                    // ROR-JEV (build 9, F35): go there and STOP. `navigate` is reversible; an
+                    // interaction on arrival turned it into starting the teleporter.
+                    case "GOTO_ID":
+                        HandleInteractId(args, interact: false);
                         break;
 
                     // Debug command: List all chests in scene
@@ -897,17 +903,24 @@ namespace Rainflayer
             }
         }
 
-        void HandleInteractId(string args)
+        void HandleInteractId(string args, bool interact)
         {
-            string label = $"INTERACT_ID:{args?.Trim()}";
+            string key = args?.Trim() ?? "";
+            string label = (interact ? "INTERACT_ID:" : "GOTO_ID:") + key;
             CharacterBody body = RainflayerPlugin.GetPlayerBody();
-            if (body == null || !int.TryParse(args?.Trim(), out int id))
+            int id = 0;
+            bool isTeleporter = !interact && key == "teleporter";
+            if (body == null || (!isTeleporter && !int.TryParse(key, out id)))
             {
                 socketBridge?.SendEvent("action_failed", ("command", label), ("reason", "bad_args"));
                 return;
             }
 
-            GameObject obj = Observation.FindInteractable(id, out int cost, out string costType);
+            int cost = 0;
+            string costType = "None";
+            GameObject obj = isTeleporter
+                ? TeleporterInteraction.instance?.gameObject
+                : Observation.FindInteractable(id, out cost, out costType);
             if (obj == null)
             {
                 // Gone, already used, or never existed: the brain's view is stale.
@@ -915,7 +928,7 @@ namespace Rainflayer
                 return;
             }
 
-            if (costType == "Money")
+            if (interact && costType == "Money")
             {
                 int gold = (int)(body.master?.money ?? 0);
                 if (gold < cost)
@@ -930,8 +943,8 @@ namespace Rainflayer
             var target = new InteractableInfo
             {
                 GameObject = obj,
-                Type = "entity",                 // ordinary navigate-then-interact
-                Name = id.ToString(),            // completion is reported as INTERACT_ID:<id>
+                Type = interact ? "entity" : "goto_entity",   // goto_entity: arrive and stop
+                Name = key,                      // completion: INTERACT_ID:<key> / GOTO_ID:<key>
                 Cost = cost,
                 Position = obj.transform.position,
                 Distance = dist,
@@ -942,7 +955,7 @@ namespace Rainflayer
 
             socketBridge?.SendEvent("action_started", ("command", label),
                 ("target", obj.name), ("distance", ((int)dist).ToString()), ("cost", cost.ToString()));
-            Log($"[INTERACT_ID] Going to {obj.name} (id {id}) at {dist:F1}m, cost {cost} {costType}");
+            Log($"[{(interact ? "INTERACT_ID" : "GOTO_ID")}] Going to {obj.name} ({key}) at {dist:F1}m, cost {cost} {costType}");
         }
 
         void HandleDebugChests()
@@ -1223,7 +1236,17 @@ namespace Rainflayer
                     bool arrived = navigationController.HandleGotoNavigation(body);
                     if (arrived)
                     {
-                        if (currentMode == "follow" || navigationController.gotoInteractable?.Type == "zone_center")
+                        if (navigationController.gotoInteractable?.Type == "goto_entity")
+                        {
+                            // ROR-JEV (build 9): GOTO_ID ends on arrival, with no interaction.
+                            socketBridge?.SendEvent("action_complete",
+                                ("command", $"GOTO_ID:{navigationController.gotoInteractable.Name}"),
+                                ("status", "success"));
+                            navigationController.isNavigating = false;
+                            navigationController.gotoTarget = null;
+                            navigationController.gotoInteractable = null;
+                        }
+                        else if (currentMode == "follow" || navigationController.gotoInteractable?.Type == "zone_center")
                         {
                             // Arrived at ally or zone center - clear nav so combat logic can run this frame
                             navigationController.isNavigating = false;
