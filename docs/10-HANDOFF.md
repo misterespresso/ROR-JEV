@@ -26,7 +26,7 @@ and started the fork, written so the next session does not re-derive any of it. 
 
 | 3 | F29: repeat-damage blocking behind `[Gameplay] BlockRepeatDamage`, default **off** | loads (cfg key written); superseded by build 4 before a run was recorded |
 | 4 | `OBSERVATION` gains a `threat` block: enemy/elite/boss/targeting counts within 50 m, 16 nearest with body, team, elite, boss, flying, distance, targeting | **yes** — fork-07: 18 frames, every body classified; `engage_range` sendable 13/18 |
-| 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **deployed** `FE06B337…` from `65b346f`; not yet run |
+| 5 | F33: combat movement and the utility dash check for ground (walk 3 m, dash 12 m); roam stops only at cliffs, ground ray from 4 m up | **no falls** — fork-09 (6 min, Verdant Falls, 274 frames with enemies, 0 environmental damage); stuck-on-terrain still to confirm by eye |
 
 Build 3 is `36faf23` (Debug `AA63B6D3…`, reproduced from the committed tree). `compare_dll` vs build 2: `LoadConfig`,
 `HealthComponent_TakeDamage`, the new property's get/set, and a compiler renumbering of
@@ -37,6 +37,12 @@ every hit whether or not blocking is on.
 **Recordings before build 3 are on the easier game** (F29). From build 3, `fork_check` and
 `record_run` write `block_repeat_damage` into `HARNESS_START`; `null` means the cfg key is absent,
 i.e. a pre-build-3 mod that blocks unconditionally — not "off".
+
+fork-09 (build 5) died at 387 s in the stage-1 teleporter event: a Stone Titan plus 17-18
+enemies, all targeting the player, 67 → −13 HP in 8 s. A fair vanilla-damage death, not a
+movement fault; whether to start the teleporter then is the call `worth_start_teleporter`
+(sendable 4/357 ticks there) hands to JEV. `[EDGE]` lines are `LogDebug` and the profile has
+`DebugMode = false`, so the log is silent about the edge check -- set it true to see them.
 
 ## Decisions (made 2026-09-21)
 
