@@ -247,6 +247,10 @@ def build_request(
     c = contract or load_contract()
     payload = c["payload"]
     out = BuiltRequest(state=strip_unknown(state), model=c["model"])
+    if c.get("game_primer"):
+        # Static facts about the game, the same every tick (jev-02). Not telemetry: never
+        # unknown, never gating anything, and first in the state so it reads as context.
+        out.state = {"game": list(c["game_primer"]), **out.state}
 
     # F32: nothing is asked of a dead character. Every question would be about a body that
     # cannot act, and `next_action` does not declare `self.hp_band`, so the field contract

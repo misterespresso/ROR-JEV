@@ -165,6 +165,7 @@ F6, F7 and F8 were settled by installing the stack and reading what r2modman res
 | F36 | **`navigate` options were indistinguishable** except by key; `gold_band` could not say "can afford" | **fixed** — options name target, cost and distance bands; gold banded against prices |
 | F37 | JEV loop held a task past a phase change; 30 s cut long walks | **fixed** — release on objective change; walks get 60 s |
 | F38 | **The roll is spent on cooldown**, so big telegraphed hits (Titan fist, Golem laser) land | open — mod reflex (dodge on wind-up) + JEV policy (save / use freely) |
+| F39 | **JEV could not choose to fight**, and had no idea how the game is played | **fixed** — `fight_nearby` option; `game` primer in every request |
 
 ### F1 — Registry invariant 9 was not enforced. **FIXED** *(blocked milestone 1; also a cost defect)*
 
@@ -1220,6 +1221,24 @@ so it is usually on cooldown when a Titan's fist or a Golem's laser -- telegraph
 lands. JEV cannot time a dodge (a decision every 2 s, ~550 ms per answer), so the split is:
 the mod dodges as a reflex when a nearby enemy is winding up a heavy attack (its entity state is
 readable), and JEV sets the policy per tick (save dodges vs use freely). Open.
+
+
+### F39 — JEV could not choose to fight, and did not know the game
+
+jev-02 (build 9): the person watching saw the character hold off on the teleporter, fight, walk
+back toward the teleporter mid-fight, return to the enemy, and repeat. The recording agrees:
+`navigate:teleporter` 84 times in 91, worth gate 0.19-0.24 throughout (correctly not starting
+it), and 10+ `GOTO_ID teleporter` round trips as the mod's own combat pulled the character away.
+JEV's options were walk-to, explore, start the teleporter, and nothing; fighting was not one,
+and nothing in the state said what kills, gold, chests or the teleporter are for.
+
+Fixed on the brain side, no rebuild: a `fight_nearby` verb (capability `fight_nearby`, command
+`ENGAGE_NEARBY` -> the fork's `MODE combat`, a standing stance that holds no slot) offered
+whenever enemies are near; and `game_primer` in `contract/questions.yaml` -- six short facts
+sent as `state.game` in every request, referenced by `next_action`'s instructions. Re-asking
+jev-02's own ticks: with few or several enemies at close/mid range, JEV now picks `fight_nearby`
+at 0.92-0.95 (was `navigate:teleporter` ~0.8-0.9); quiet and broke, `explore` 0.36-0.47 (was
+the teleporter ~0.8).
 
 ---
 

@@ -44,6 +44,7 @@ phases:
       - set_posture             # minimal: strategy + engage_range applied
       - disengage               # minimal: retreat along a feasible path
       - defend_zone             # minimal: hold inside the charging radius
+      - fight_nearby            # standing combat stance; jev-02 had no way to choose to fight
     notes: >
       defend_zone is pulled forward because the first milestone requires completing teleporter
       charging. Stock Rainflayer already has holdout behavior (MODE:defend_zone); if it verifies,
@@ -103,6 +104,7 @@ milestone_1:
     - set_posture
     - disengage
     - defend_zone
+    - fight_nearby
   required_questions:
     - next_action
     - engagement_response

@@ -74,6 +74,12 @@ verbs:
     range_gated: false
     requires_worth_gate: false
     capability: search
+  fight_nearby:
+    command: ENGAGE_NEARBY
+    commitment: reversible
+    range_gated: false
+    requires_worth_gate: false
+    capability: fight_nearby
 
 sentinels:
   none: { serializes: false, capability_exempt: true }

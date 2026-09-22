@@ -16,6 +16,18 @@
 schema_version: 1
 model: jev-1.13.0
 
+# How Risk of Rain 2 is played, sent in every request as `state.game` (jev-02: asked to judge
+# options with no idea what they are for, JEV walked to the teleporter 84 times in 91 while
+# the character fought its way back and forth). Short, literal, positive facts -- JEV reads
+# literally and large irrelevant state degrades it (01-RESEARCH.md section 2). Review it.
+game_primer:
+  - "Killing enemies is the only way to earn gold and experience."
+  - "Gold opens chests. Chests give items. Items and experience levels make the character stronger."
+  - "Enemies grow stronger as run time passes, so time on a stage is well spent only if it makes the character stronger: kills, chests, items."
+  - "Starting the teleporter summons a boss and many extra enemies, and it cannot be undone. The character must then stay inside the teleporter zone until it is fully charged."
+  - "A strong stage: fight the enemies nearby, open the chests the character can afford, then start the teleporter once the character is strong enough to beat a boss."
+  - "A fight that is going well is worth finishing. Walking away from damaged enemies throws away the damage already dealt."
+
 questions:
 
   next_action:
@@ -178,8 +190,8 @@ payload:
   next_action:
     instructions: >-
       Choose what the character should do next. Each option is a complete committed action
-      including what it costs. Judge each against `threat`, `hazards`, `economy.gold_band`,
-      `run.time_band` and `objective.phase`.
+      including what it costs. `game` explains how the game is played. Judge each option
+      against `threat`, `hazards`, `economy.gold_band`, `run.time_band` and `objective.phase`.
     # Per-verb option text. The rendered option key is `<verb>:<entity_id>` for entity
     # verbs and the bare verb for non-entity verbs.
     option_templates:
@@ -197,6 +209,9 @@ payload:
         not_for: "Stages where the teleporter is already found."
       explore:
         what: "Move through unexplored parts of the stage looking for anything useful."
+      fight_nearby:                                # jev-02
+        what: "Stay and fight the enemies nearby until they are dead. Kills give gold and experience."
+        not_for: "Health too low to keep trading hits, or an enemy group too strong to win against."
       navigate:                                    # AUTHORED-IN-PHASE-0
         # F36: jev-01 chose navigate:teleporter at ~0.9 every tick; every navigate option had
         # this same text, so only the key told a cheap nearby chest from the teleporter.

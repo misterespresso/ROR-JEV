@@ -62,6 +62,8 @@ def to_mod(cmd: Command) -> ModCommand | None:
         kind = "chest" if tid.startswith("chest") else "shrine" if tid.startswith("shrine") else None
         return (ModCommand("FIND_AND_INTERACT", kind, True, f"FIND_AND_INTERACT:{kind}")
                 if kind else None)
+    if c == "ENGAGE_NEARBY":
+        return ModCommand("MODE", "combat", False, "MODE:combat")
     if c == "SEARCH":
         return ModCommand("MODE", "roam", False, "MODE:roam")
     if c == "DEFEND_ZONE":

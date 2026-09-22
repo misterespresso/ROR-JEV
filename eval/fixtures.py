@@ -16,7 +16,7 @@ from dataclasses import dataclass
 #: Milestone 1: Commando, Drizzle, solo, L2 disabled, no equipment capability.
 MILESTONE_1_CAPABILITIES = frozenset({
     "observation_v2", "navigate_target", "interact_target", "search",
-    "set_posture", "disengage", "defend_zone",
+    "set_posture", "disengage", "defend_zone", "fight_nearby",
 })
 
 RAW_BASE: dict = {

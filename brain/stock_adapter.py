@@ -374,7 +374,9 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                       "teleporter_charge": num(objective.get("teleporter_charge"), 0)
                       if objective else UNKNOWN},
         "interactables": ilist,
-        "threat": {"enemies": [], "boss_active": bool(objective.get("boss_active"))
+        "threat": {"enemies": [],
+                   "enemy_count": num(combat.get("enemy_count"), 0) if combat else 0,
+                   "boss_active": bool(objective.get("boss_active"))
                    if objective else False,
                    # Not measured by stock, and not guessable. The pathfinder owns these.
                    "reposition_feasible": UNKNOWN,

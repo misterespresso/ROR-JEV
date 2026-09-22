@@ -168,6 +168,28 @@ def trace_navigate_options_name_their_target():
           all("nothing is used or started" in t for t in nav.values()), str(nav))
 
 
+def trace_fight_and_primer():
+    print("\njev-02: fighting is choosable, and the game primer rides in every request")
+    asked: list = []
+    fight = frames(True)
+    fight["QUERY_COMBAT_STATUS"].update({"enemy_count": 3, "nearest_enemy_distance": 12.0})
+    p, rec = run([fight], pick="fight_nearby", asked=asked)
+    crit = asked[0]["questions"]["next_action"]["criteria"]
+    check("fight_nearby is offered with enemies near", "fight_nearby" in crit, str(sorted(crit)))
+    check("picking it sets the mod's combat stance", ("MODE", "combat") in p.commands, str(p.commands))
+    check("it holds no task slot (JEV re-decides next tick)",
+          not any(f.get("note") == "task_released" for f in rec.frames))
+    quiet: list = []
+    run([frames(True)], pick="none", asked=quiet)
+    check("not offered with no enemies",
+          "fight_nearby" not in quiet[0]["questions"]["next_action"]["criteria"])
+    game = asked[0]["state"].get("game")
+    check("the primer is in the state, first", isinstance(game, list) and game
+          and list(asked[0]["state"])[0] == "game", str(list(asked[0]["state"])[:3]))
+    check("and the instructions point at it",
+          "`game`" in asked[0]["questions"]["next_action"]["instructions"])
+
+
 def trace_dead_asks_nothing():
     print("\njev_run.loop: no call to JEV while dead")
     asked: list = []
@@ -178,7 +200,8 @@ def trace_dead_asks_nothing():
 
 if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
-              trace_navigate_options_name_their_target, trace_dead_asks_nothing):
+              trace_navigate_options_name_their_target, trace_fight_and_primer,
+              trace_dead_asks_nothing):
         t()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

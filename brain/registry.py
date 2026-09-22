@@ -22,6 +22,7 @@ VERBS = {
     "fight_boss":        ("FIGHT_TARGET",    "reversible",   False, False, "fight_target"),
     "search_teleporter": ("SEARCH",          "reversible",   False, False, "search"),
     "explore":           ("SEARCH",          "reversible",   False, False, "search"),
+    "fight_nearby":      ("ENGAGE_NEARBY",   "reversible",   False, False, "fight_nearby"),
 }
 
 #: Which verb an interactable type offers. Range gating is applied afterwards, per verb,
@@ -180,6 +181,13 @@ def build_registry(
         reg["explore"] = ActionRecord(
             "explore", "explore", "SEARCH", {"for": "interactables"},
             phase, "reversible", "search")
+    # jev-02: with enemies close and the teleporter judged not worth starting, JEV's only
+    # options were walking somewhere -- it chose the teleporter 84 times in 91 while the mod's
+    # own combat dragged the character back and forth. Fighting has to be choosable.
+    if "fight_nearby" in capabilities and (obs.get("threat", {}).get("enemy_count") or 0) > 0:
+        reg["fight_nearby"] = ActionRecord(
+            "fight_nearby", "fight_nearby", "ENGAGE_NEARBY", {}, phase, "reversible",
+            "fight_nearby")
 
     _assert_invariants(reg, capabilities, has_active_task)
     return reg

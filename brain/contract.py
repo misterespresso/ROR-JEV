@@ -69,6 +69,11 @@ COMMAND_SPECS: dict[str, CommandSpec] = {
     "FIGHT_TARGET": CommandSpec(
         "FIGHT_TARGET", True, "target defeated, target invalidated, cancelled, or failed", None
     ),
+    # Standing combat stance (jev-02): no end of its own, so it never holds the task slot and
+    # JEV re-decides it every tick, like SEARCH under the fork's MODE:roam.
+    "ENGAGE_NEARBY": CommandSpec(
+        "ENGAGE_NEARBY", False, "stance applied; fighting continues until another choice", 1_000
+    ),
     "DISENGAGE": CommandSpec(
         "DISENGAGE", False, "withdrawal condition reached, or bounded deadline", 8_000
     ),
