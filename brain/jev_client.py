@@ -1,4 +1,19 @@
-"""The one network call: a built request to TypeSafe's System One endpoint, answers back.
+"""The one network call: a built request to a System One endpoint, answers back.
+
+Two backends, same wire format:
+
+  * **JEV** (TypeSafe, hosted) -- the default, needs a key.
+  * **Laya** (convaiinnovations, open weights, Apache 2.0) -- a 421M decision model that
+    `laya-serve` exposes on the SAME `POST /v1/systemone`, so only the URL changes. Local,
+    free, no key. `pip install "laya[serve]"` then `LAYA_DEVICE=cuda laya-serve`.
+
+Point the loop at Laya by setting the endpoint; nothing else in the brain changes:
+
+    JEV_ENDPOINT=http://127.0.0.1:8000/v1/systemone python -m eval.jev_run --run-id laya-01 ...
+
+The answers come from a different model, so treat a backend switch as a change of behaviour,
+not a change of plumbing: the primer, option text and gate thresholds were all tuned against
+JEV. `JevResult.model` records which model answered, and the recorder keeps it per tick.
 
 Standard library only (`urllib`), so the live loop needs nothing installed. The key comes
 from `JEV_KEY` (this project's name for it) or else `TYPESAFE_API_KEY` (the name TypeSafe's
@@ -16,8 +31,25 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+#: TypeSafe's hosted endpoint, overridable for a local Laya server.
+DEFAULT_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+ENDPOINT_ENV = "JEV_ENDPOINT"
 KEY_ENVS = ("JEV_KEY", "TYPESAFE_API_KEY")
+
+
+def endpoint() -> str:
+    return os.environ.get(ENDPOINT_ENV, "").strip() or DEFAULT_ENDPOINT
+
+
+def is_local(url: str) -> bool:
+    """A server on this machine needs no API key (laya-serve takes none)."""
+    return any(h in url for h in ("localhost", "127.0.0.1", "[::1]", "0.0.0.0"))
+
+
+def backend(url: str | None = None) -> str:
+    """What to print and record: which model is about to be asked."""
+    url = url or endpoint()
+    return "laya (local)" if is_local(url) else "jev (typesafe)"
 
 #: A tick's answer is worthless once the world has moved on; the loop skips the tick instead.
 TIMEOUT_S = 3.0
@@ -63,17 +95,21 @@ def _key() -> str:
 
 
 def have_key() -> bool:
-    return bool(_key())
+    """A key is required for the hosted endpoint only."""
+    return bool(_key()) or is_local(endpoint())
 
 
-def ask(wire: dict, *, timeout_s: float = TIMEOUT_S, endpoint: str = ENDPOINT) -> JevResult:
+def ask(wire: dict, *, timeout_s: float = TIMEOUT_S, endpoint: str | None = None) -> JevResult:
     """POST one fan-out request (`BuiltRequest.wire()`) and return the parsed answers."""
+    url = endpoint or globals()["endpoint"]()
     key = _key()
-    if not key:
+    if not key and not is_local(url):
         raise JevError(None, f"none of {', '.join(KEY_ENVS)} is set")
     body = json.dumps(wire, separators=(",", ":")).encode("utf-8")
-    req = urllib.request.Request(endpoint, data=body, method="POST", headers={
-        "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
     t0 = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=timeout_s) as r:
@@ -85,7 +121,7 @@ def ask(wire: dict, *, timeout_s: float = TIMEOUT_S, endpoint: str = ENDPOINT) -
             detail = e.read().decode("utf-8", "replace")[:300]
         except Exception:                                  # noqa: BLE001
             pass
-        raise JevError(e.code, detail.replace(key, "<redacted>")) from None
+        raise JevError(e.code, detail.replace(key, "<redacted>") if key else detail) from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise JevError(None, type(e).__name__) from None
     return JevResult(answers=payload.get("answers") or {}, usage=payload.get("usage") or {},
