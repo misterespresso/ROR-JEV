@@ -219,6 +219,8 @@ payload:
       Choose what the character should do next. Each option is a complete committed action
       including what it costs. `game` explains how the game is played. Judge each option
       against `threat`, `hazards`, `economy.gold_band`, `run.time_band` and `objective.phase`.
+      `control.active_action` describes the task already underway. Continuing it finishes
+      that task; choosing something else can abandon the current walk.
     # Per-verb option text. The rendered option key is `<verb>:<entity_id>` for entity
     # verbs and the bare verb for non-entity verbs.
     option_templates:
@@ -241,6 +243,9 @@ payload:
       open_equipment_barrel:                       # jev-03
         what: "Open the equipment barrel you are standing at ({cost_band}). Spends gold; gives a random equipment item, which replaces any equipment carried."
         not_for: "When the gold is needed for a chest."
+      take_equipment:
+        what: "Take {item} from the ground, replacing {carried_equipment}. The old equipment will be left here."
+        not_for: "When the equipment already carried is more useful for this run."
       buy_from_terminal:                           # jev-03
         what: "Buy {item} from the shop terminal you are standing at ({cost_band}). Spends gold; the item is known before paying."
         not_for: "An item that does not fit `build.identity`, or an unknown item when a chest is affordable."

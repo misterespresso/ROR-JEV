@@ -9,6 +9,7 @@ Run: python eval/test_jev_loop.py
 """
 from __future__ import annotations
 
+import copy
 import sys
 import types
 from pathlib import Path
@@ -75,6 +76,7 @@ class FakeProbe:
 
     def command(self, command, args=""):
         self.commands.append((command, args))
+        return {"type": "COMMAND_RESPONSE", "command": command, "status": "ok"}
 
 
 class FakeRec:
@@ -115,6 +117,9 @@ def trace_bridge():
 
     m = to_mod(cmd("INTERACT_TARGET", target_id="barrel@-97000"))
     check("interact by ID", m and (m.command, m.args, m.holds_slot) == ("INTERACT_ID", "-97000", True))
+    m = to_mod(cmd("PICKUP_TARGET", target_id="equipment_pickup@-97111"))
+    check("equipment replacement names the exact ground pickup",
+          m and (m.command, m.args, m.holds_slot) == ("PICKUP_ID", "-97111", True))
     m = to_mod(cmd("NAVIGATE_TARGET", target_id="teleporter-0"))
     check("F35: navigating to the teleporter only walks there",
           m and (m.command, m.args) == ("GOTO_ID", "teleporter"), str(m))
@@ -149,8 +154,11 @@ def trace_loop_executes_the_pick():
           any(f.get("note") == "task_released" for f in rec.frames),
           str([f for f in rec.frames if f.get("type") == "HARNESS_NOTE"]))
     check("every exchange recorded", sum(f["type"] == "JEV_EXCHANGE" for f in rec.frames) == len(asked))
-    check("provenance is jev:", all(f["origin"].startswith("jev:") for f in rec.frames
-                                    if f["type"] == "HARNESS_DECISION"))
+    check("new actions have JEV provenance; safety only stops existing tasks",
+          all(f["origin"].startswith("jev:") or
+              (f["origin"] == "safety:task_release" and f["command"] == "GOTO"
+               and f["args"] == "cancel" and f["action_id"] is None)
+              for f in rec.frames if f["type"] == "HARNESS_DECISION"))
 
 
 def trace_navigate_options_name_their_target():
@@ -227,6 +235,46 @@ def trace_equipment():
     check("a confident yes fires it", ("USE_EQUIPMENT", "") in p.commands, str(p.commands))
 
 
+def trace_equipment_replacement_choice():
+    print("\njev-18: a ground equipment replacement is visible and only JEV can authorize it")
+    drop = frames(False)
+    drop["QUERY_OBSERVATION"]["self"]["equipment"] = {
+        "name": "Fruit", "charges": 1, "ready": True}
+    drop["QUERY_OBSERVATION"]["equipment_pickups"] = [{
+        "id": -97111, "name": "CommandMissile", "display": "Disposable Missile Launcher",
+        "distance": 3.0}]
+    asked: list = []
+    p, rec = run([drop, drop], pick="none", asked=asked)
+    opts = asked[0]["questions"]["next_action"]["criteria"]
+    take = next((v for k, v in opts.items() if k.startswith("take_equipment:")), None)
+    check("JEV sees the dropped equipment and the equipment it would replace",
+          take and "Disposable Missile Launcher" in take["what"]
+          and "Foreign Fruit" in take["what"], str(take))
+    check("declining it sends no pickup command",
+          not any(c[0] == "PICKUP_ID" for c in p.commands), str(p.commands))
+
+    asked = []
+    p, rec = run([drop] * 5, pick="none", asked=asked)
+    check("repeatedly leaving it is remembered instead of distracting every tick",
+          not any(k.startswith("take_equipment:")
+                  for k in asked[-1]["questions"]["next_action"]["criteria"]),
+          str(sorted(asked[-1]["questions"]["next_action"]["criteria"])))
+
+    asked = []
+    p, rec = run([drop, drop], pick="take_equipment", asked=asked)
+    check("JEV choosing it sends the exact pickup ID",
+          ("PICKUP_ID", "-97111") in p.commands, str(p.commands))
+
+    empty_slot = copy.deepcopy(drop)
+    empty_slot["QUERY_OBSERVATION"]["self"]["equipment"] = None
+    asked = []
+    run([empty_slot], pick="none", asked=asked)
+    check("an empty slot uses the mod pickup reflex without a replacement choice",
+          not any(k.startswith("take_equipment:")
+                  for k in asked[0]["questions"]["next_action"]["criteria"]),
+          str(sorted(asked[0]["questions"]["next_action"]["criteria"])))
+
+
 def trace_redirect():
     print("\njev-06: a walk is redirected when JEV wants another target two ticks running")
     far = frames(True)
@@ -268,6 +316,38 @@ def trace_redirect():
     check("two ticks wanting anything else redirects to the latest pick",
           len(gotos) == 2 and gotos[1] != ("GOTO_ID", str(CHEST)), str(gotos))
 
+    p, rec = go(["chest_small", "explore", "explore"])
+    check("JEV can abandon a walk to explore; the old path is cancelled first",
+          p.commands[:3] == [("GOTO_ID", str(CHEST)), ("GOTO", "cancel"),
+                             ("MODE", "roam")], str(p.commands))
+    far["QUERY_COMBAT_STATUS"].update({"enemy_count": 1, "nearest_enemy_distance": 12.0})
+    p, rec = go(["chest_small", "fight_nearby", "fight_nearby"])
+    check("JEV can abandon a walk to fight; combat receives movement control",
+          p.commands[:3] == [("GOTO_ID", str(CHEST)), ("GOTO", "cancel"),
+                             ("MODE", "combat")], str(p.commands))
+
+    far["QUERY_INTERACTABLES"]["interactables"] = [
+        {"type": "teleporter", "name": "Teleporter", "distance": 3.0, "cost": 0,
+         "charged": False, "bossActive": False, "chargePercent": 0.0}]
+    p, rec = go(["chest_small", "start_teleporter", "start_teleporter"])
+    check("a teleporter choice missing its worth gate cannot displace an active task",
+          p.commands == [("GOTO_ID", str(CHEST))], str(p.commands))
+
+    original = FakeProbe.command
+    def drop_first_stop(self, command, args=""):
+        reply = original(self, command, args)
+        if self.commands.count(("GOTO", "cancel")) == 1 and command == "GOTO":
+            return None
+        return reply
+    FakeProbe.command = drop_first_stop
+    try:
+        p, rec = go(["chest_small", "explore", "explore", "explore"])
+    finally:
+        FakeProbe.command = original
+    check("an unacknowledged redirect is retried before asking for another action",
+          p.commands[:4] == [("GOTO_ID", str(CHEST)), ("GOTO", "cancel"),
+                             ("GOTO", "cancel"), ("MODE", "roam")], str(p.commands))
+
 
 def trace_stuck_walk():
     print("\njev-09: a walk that gets no closer is abandoned, and that target is set aside")
@@ -287,6 +367,73 @@ def trace_stuck_walk():
           all(not any(str(CHEST) in k for k in w["questions"]["next_action"]["criteria"])
               for w in later), str([sorted(w["questions"]["next_action"]["criteria"]) for w in later][:1]))
     check("only one walk was ever sent", len([c for c in p.commands if c[0] == "GOTO_ID"]) == 1, str(p.commands))
+    check("a stuck walk is stopped in the game before the next action",
+          p.commands[:3] == [("GOTO_ID", str(CHEST)), ("GOTO", "cancel"),
+                             ("MODE", "roam")], str(p.commands))
+
+
+def trace_stop_ack_and_active_task():
+    print("\nF59: JEV sees its task; abandoned navigation must acknowledge a stop")
+    far = frames(True)
+    far["QUERY_OBSERVATION"]["interactables"]["items"][-1]["distance"] = 40.0
+    asked: list = []
+    p, rec = run([far, far, frames(False)], pick=str(CHEST), asked=asked)
+    active = asked[1]["state"]["control"]["active_action"]
+    check("the request names the actual active target and describes the task",
+          active and active["id"] == f"navigate:chest_small@{CHEST}"
+          and "small chest" in active["what"], str(active))
+    check("active task state clears once the target is gone and navigation is stopped",
+          asked[2]["state"]["control"]["active_action"] is None)
+
+    original = FakeProbe.command
+    def drop_stop_reply(self, command, args=""):
+        reply = original(self, command, args)
+        return None if command == "GOTO" and args == "cancel" else reply
+    FakeProbe.command = drop_stop_reply
+    try:
+        asked = []
+        p, rec = run([far, frames(False), frames(False)], pick=str(CHEST), asked=asked)
+    finally:
+        FakeProbe.command = original
+    check("an unacknowledged stop blocks replacement actions and is retried",
+          len(asked) == 1 and p.commands[0] == ("GOTO_ID", str(CHEST))
+          and len(p.commands) >= 3
+          and all(c == ("GOTO", "cancel") for c in p.commands[1:]), str(p.commands))
+    check("the failed stop is recorded, not reported as a released task",
+          any(f.get("note") == "task_stop" and f["acknowledged"] is False for f in rec.frames)
+          and not any(f.get("note") == "task_released" for f in rec.frames))
+
+
+def trace_teleporter_identity():
+    print("\nF60: sorting nearby objects cannot rename the teleporter")
+    import copy
+    first = frames(False)
+    first["QUERY_INTERACTABLES"]["interactables"] = [
+        {"type": "teleporter", "name": "Teleporter", "distance": 40.0, "cost": 0,
+         "charged": False, "bossActive": False, "chargePercent": 0.0},
+        {"type": "chest", "name": "Chest", "distance": 60.0, "cost": 25}]
+    reordered = copy.deepcopy(first)
+    reordered["QUERY_INTERACTABLES"]["interactables"][1]["distance"] = 10.0
+    asked: list = []
+    p, rec = run([first, reordered, reordered], pick="teleporter", asked=asked)
+    check("the same teleporter remains the same action after another object moves closer",
+          all("navigate:teleporter" in w["questions"]["next_action"]["criteria"] for w in asked))
+    check("there is one walk, with no redirect to the same teleporter",
+          p.commands == [("GOTO_ID", "teleporter")]
+          and not any(f.get("note") == "task_redirected" for f in rec.frames), str(p.commands))
+
+
+def trace_build_identity():
+    print("\nF61: numeric mod_build matches the expected build without a false warning")
+    import contextlib
+    import io
+    fr = frames(False)
+    fr["QUERY_OBSERVATION"]["mod_build"] = 20
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        run([fr], pick="none", asked=[])
+    check("the current numeric build does not produce a mismatch warning",
+          "The game is running fork build" not in output.getvalue(), output.getvalue())
 
 
 def trace_refused_action_is_withheld():
@@ -358,7 +505,8 @@ def trace_dead_asks_nothing():
 if __name__ == "__main__":
     for t in (trace_bridge, trace_loop_executes_the_pick,
               trace_navigate_options_name_their_target, trace_fight_and_primer,
-              trace_equipment, trace_redirect, trace_stuck_walk,
+              trace_equipment, trace_equipment_replacement_choice, trace_redirect, trace_stuck_walk,
+              trace_stop_ack_and_active_task, trace_teleporter_identity, trace_build_identity,
               trace_refused_action_is_withheld,
               trace_declined_in_range, trace_dead_asks_nothing):
         t()

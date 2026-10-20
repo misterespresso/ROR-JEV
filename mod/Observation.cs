@@ -27,7 +27,7 @@ namespace Rainflayer
     internal static class Observation
     {
         /// <summary>The fork build number, reported in every snapshot (build 18+).</summary>
-        public const int MOD_BUILD = 18;
+        public const int MOD_BUILD = 20;
 
         /// <summary>Environmental damage within this window counts as "taking" it now.</summary>
         const float ENV_DAMAGE_WINDOW_S = 2f;
@@ -105,9 +105,8 @@ namespace Rainflayer
             {
                 P("type", S("OBSERVATION")),
                 P("v", "1"),
-                // ROR-JEV (build 18): which fork build is actually loaded. jev-14..16 ran on a
-                // DLL deployed two builds earlier -- the game only loads it at startup -- and
-                // nothing said so, so three runs were read as if the new code were in.
+                // Which fork build is actually loaded; deployment alone does not reload it.
+                // The stale-build claim about jev-14..16 was unproven (handoff 2 / F56).
                 P("mod_build", MOD_BUILD.ToString(CultureInfo.InvariantCulture)),
                 P("t_mono_ms", F(Time.realtimeSinceStartup * 1000f)),
             };
@@ -175,7 +174,55 @@ namespace Rainflayer
             top.Add(P("hazards", "{" + string.Join(",", hazardFields) + "}"));
             top.Add(P("threat", Threat(body)));
             top.Add(P("interactables", Interactables(body)));
+            top.Add(P("equipment_pickups", EquipmentPickups(body)));
             return "{" + string.Join(",", top) + "}";
+        }
+
+        /// <summary>Equipment lying on the ground close enough that the player could see it.</summary>
+        static string EquipmentPickups(CharacterBody body)
+        {
+            var found = new List<KeyValuePair<float, string>>();
+            foreach (var pickup in UnityEngine.Object.FindObjectsOfType<GenericPickupController>())
+            {
+                if (pickup == null || pickup.gameObject == null || !pickup.gameObject.activeInHierarchy)
+                    continue;
+                var def = PickupCatalog.GetPickupDef(pickup.pickupIndex);
+                if (def == null || def.equipmentIndex == EquipmentIndex.None)
+                    continue;
+                float d = Vector3.Distance(body.corePosition, pickup.transform.position);
+                if (d > 30f || !HasSeen(body, pickup.gameObject, d))
+                    continue;
+                var eq = EquipmentCatalog.GetEquipmentDef(def.equipmentIndex);
+                found.Add(new KeyValuePair<float, string>(d, "{" + string.Join(",", new[]
+                {
+                    P("id", pickup.gameObject.GetInstanceID().ToString(CultureInfo.InvariantCulture)),
+                    P("name", S(eq?.name ?? def.internalName ?? "unknown")),
+                    P("display", S(Language.GetString(def.nameToken) ?? "")),
+                    P("distance", F(d)),
+                }) + "}"));
+            }
+            found.Sort((x, y) => x.Key.CompareTo(y.Key));
+            var list = new List<string>();
+            for (int i = 0; i < found.Count && i < 8; i++)
+                list.Add(found[i].Value);
+            return "[" + string.Join(",", list) + "]";
+        }
+
+        public static GameObject? FindEquipmentPickup(int id, out EquipmentIndex equipmentIndex)
+        {
+            equipmentIndex = EquipmentIndex.None;
+            foreach (var pickup in UnityEngine.Object.FindObjectsOfType<GenericPickupController>())
+            {
+                if (pickup == null || pickup.gameObject == null || !pickup.gameObject.activeInHierarchy
+                    || pickup.gameObject.GetInstanceID() != id)
+                    continue;
+                var def = PickupCatalog.GetPickupDef(pickup.pickupIndex);
+                if (def == null || def.equipmentIndex == EquipmentIndex.None)
+                    return null;
+                equipmentIndex = def.equipmentIndex;
+                return pickup.gameObject;
+            }
+            return null;
         }
 
         /// <summary>

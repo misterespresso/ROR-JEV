@@ -104,6 +104,12 @@ verbs:
     range_gated: true
     requires_worth_gate: false
     capability: interact_target
+  take_equipment:
+    command: PICKUP_TARGET
+    commitment: costly
+    range_gated: false
+    requires_worth_gate: false
+    capability: equipment
 
 sentinels:
   none: { serializes: false, capability_exempt: true }
@@ -121,3 +127,4 @@ type_to_verb:
   equipment_barrel: open_equipment_barrel
   shop_terminal: buy_from_terminal
   drone: repair_drone
+  equipment_pickup: take_equipment

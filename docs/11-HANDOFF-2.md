@@ -1,5 +1,8 @@
 # Handoff 2 — 2026-09-22
 
+Continuation: [`12-HANDOFF-CONTROL.md`](12-HANDOFF-CONTROL.md) records the subsequent control
+fixes and build 19. This document preserves the end-of-build-18 state.
+
 Read this first, then `10-HANDOFF.md` for the Phase 0 half. This session took the project from
 "the brain has never made a decision" to **JEV playing the game end to end**: it reads the game
 every second, picks from options it can tell apart, and the fork carries out the pick.

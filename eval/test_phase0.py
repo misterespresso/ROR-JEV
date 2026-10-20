@@ -798,8 +798,8 @@ def trace_full_interactables():
           any(k.startswith("open_chest") and "111" in k for k in reg), str(sorted(reg)))
 
     ad2 = adapt(*stock, observation_id="o", seq=2, observation=_obs())
-    check("without the block, stock's list is used unchanged",
-          [i["entity_id"] for i in ad2.raw["interactables"]] == ["chest-0", "teleporter-1"],
+    check("without the block, stock's list keeps a stable teleporter identity",
+          [i["entity_id"] for i in ad2.raw["interactables"]] == ["chest-0", "teleporter"],
           str([i["entity_id"] for i in ad2.raw["interactables"]]))
 
 

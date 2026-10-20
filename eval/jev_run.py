@@ -46,7 +46,7 @@ USD_PER_INPUT_TOKEN = 0.042 / 1_000_000
 
 #: A task the mod never reports on is released after this long (F25): walks get the
 #: contract's NAVIGATE_TARGET deadline, interactions less (jev-01: 30 s cut a long walk short).
-TASK_TIMEOUT_S = {"GOTO_ID": 60.0}
+TASK_TIMEOUT_S = {"GOTO_ID": 60.0, "PICKUP_ID": 15.0}
 TASK_TIMEOUT_DEFAULT_S = 30.0
 
 #: jev-06: JEV preferred another target for 40 s of a 42 s walk and could not say so. A walk is
@@ -85,7 +85,7 @@ BACKOFF_S = {429: 5.0, 529: 5.0}
 
 #: The build this brain was written against. The mod reports its own in every snapshot; if they
 #: differ, the game was launched before the last deploy and the run proves nothing about it.
-EXPECTED_MOD_BUILD = 19
+EXPECTED_MOD_BUILD = 20
 
 EVENT_STATE = {"action_started": State.NAVIGATING, "action_complete": State.COMPLETED,
                "action_failed": State.FAILED}
@@ -112,7 +112,9 @@ def available_ids(observation: dict | None) -> set[str] | None:
     block = (observation or {}).get("interactables")
     if not isinstance(block, dict):
         return None
-    return {str(it.get("id")) for it in block.get("items") or []}
+    ids = {str(it.get("id")) for it in block.get("items") or []}
+    ids.update(str(it.get("id")) for it in (observation or {}).get("equipment_pickups") or [])
+    return ids
 
 
 def stop_task(p, rec, task: Task, *, origin: str, reason: str, state: State) -> bool:
@@ -310,6 +312,10 @@ def loop(p, rec, a, contract, caps, stop) -> int:
             block["items"] = [it for it in block.get("items") or []
                               if str(it.get("id")) not in quarantined]
             obs["interactables"] = block
+            if isinstance(obs.get("equipment_pickups"), list):
+                obs["equipment_pickups"] = [
+                    it for it in obs["equipment_pickups"]
+                    if str(it.get("id")) not in quarantined]
         ad = adapt(got["QUERY_OBJECTIVE"], got["QUERY_INVENTORY"], got["QUERY_COMBAT_STATUS"],
                    got["QUERY_INTERACTABLES"], observation_id=f"{a.run_id}-{n}", seq=n,
                    observation=obs,
@@ -420,7 +426,7 @@ def loop(p, rec, a, contract, caps, stop) -> int:
                     life.on_event(cmd.command_id, State.ACCEPTED)
                     # The object this task is about, when it names one: used to notice it
                     # was used (gone from the list) and whether a walk is making progress.
-                    iid = (mc.args if mc.command in ("INTERACT_ID", "GOTO_ID")
+                    iid = (mc.args if mc.command in ("INTERACT_ID", "GOTO_ID", "PICKUP_ID")
                            and mc.args != "teleporter" else None)
                     task = Task(cmd.command_id, mc.label, iid, now, st.objective,
                                 TASK_TIMEOUT_S.get(mc.command, TASK_TIMEOUT_DEFAULT_S),

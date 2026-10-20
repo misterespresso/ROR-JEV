@@ -33,6 +33,9 @@ VERBS = {
     "open_equipment_barrel":  ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
     "buy_from_terminal":      ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
     "repair_drone":           ("INTERACT_TARGET", "costly",     True, False, "interact_target"),
+    # Replacing carried equipment is a real choice. With an empty slot the mod takes it as a
+    # reflex, because there is no tradeoff to adjudicate.
+    "take_equipment":         ("PICKUP_TARGET",   "costly",     False, False, "equipment"),
 }
 
 #: Which verb an interactable type offers. Range gating is applied afterwards, per verb,
@@ -50,6 +53,7 @@ TYPE_TO_VERB = {
     "equipment_barrel": "open_equipment_barrel",
     "shop_terminal": "buy_from_terminal",
     "drone": "repair_drone",
+    "equipment_pickup": "take_equipment",
 }
 
 #: A fight is worth offering only when an enemy is this close (jev-03: offered for any enemy

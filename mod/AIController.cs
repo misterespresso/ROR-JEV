@@ -205,6 +205,8 @@ namespace Rainflayer
             lastHealth = 100f;
             wasInCombat = false;
             waitingForPickup = false;
+            pickupReflexTarget = null;
+            ClearEquipmentPickup();
             Log("[RESET] ✓ Event tracking reset");
 
             Log("[RESET] ========================================");
@@ -296,6 +298,12 @@ namespace Rainflayer
                         HandleInteractId(args, interact: false);
                         break;
 
+                    // Take a specific equipment drop that JEV saw. This may replace carried
+                    // equipment, so it is never folded into a generic item-pickup reflex.
+                    case "PICKUP_ID":
+                        HandlePickupId(args);
+                        break;
+
                     // ROR-JEV (build 13, F34): who to shoot, chosen by JEV each tick.
                     case "TARGET_PRIORITY":
                     {
@@ -358,6 +366,7 @@ namespace Rainflayer
                 // stuck timers, interaction target, etc.  Previous code only cleared 3 fields
                 // leaving stale path/smoothing/waypoint state that corrupted the next command.
                 navigationController.CancelNavigation("GOTO:cancel");
+                ClearEquipmentPickup();
                 navigationController.ClearIslandTracking();
                 // Force wait mode so the bot actually stops moving after cancel.
                 currentMode = "wait";
@@ -1002,17 +1011,82 @@ namespace Rainflayer
         private const float LOOT_WATCH_RANGE = 20f;
         private float lootWatchUntil;
 
+        private GameObject equipmentPickupTarget;
+        private EquipmentIndex equipmentPickupIndex = EquipmentIndex.None;
+        private string equipmentPickupCommand;
+        private float equipmentPickupUntil;
+
+        private void ClearEquipmentPickup()
+        {
+            equipmentPickupTarget = null;
+            equipmentPickupIndex = EquipmentIndex.None;
+            equipmentPickupCommand = null;
+            equipmentPickupUntil = 0f;
+        }
+
+        private void HandlePickupId(string args)
+        {
+            string key = args?.Trim() ?? "";
+            string label = "PICKUP_ID:" + key;
+            int id;
+            EquipmentIndex index;
+            GameObject obj;
+            if (!int.TryParse(key, out id)
+                || (obj = Observation.FindEquipmentPickup(id, out index)) == null)
+            {
+                socketBridge?.SendEvent("action_failed", ("command", label), ("reason", "not_found"));
+                return;
+            }
+            equipmentPickupTarget = obj;
+            equipmentPickupIndex = index;
+            equipmentPickupCommand = label;
+            equipmentPickupUntil = Time.time + 12f;
+            socketBridge?.SendEvent("action_started", ("command", label),
+                ("target", index.ToString()));
+            Log($"[PICKUP_ID] Taking equipment {index} ({key})");
+        }
+
+        private bool HandleEquipmentPickup(CharacterBody body)
+        {
+            if (equipmentPickupCommand == null)
+                return false;
+            EquipmentIndex current = body.inventory
+                ? body.inventory.currentEquipmentIndex : EquipmentIndex.None;
+            if (current == equipmentPickupIndex)
+            {
+                socketBridge?.SendEvent("action_complete", ("command", equipmentPickupCommand),
+                    ("status", "success"));
+                ClearEquipmentPickup();
+                return false;
+            }
+            if (Time.time > equipmentPickupUntil || equipmentPickupTarget == null
+                || !equipmentPickupTarget.activeInHierarchy)
+            {
+                socketBridge?.SendEvent("action_failed", ("command", equipmentPickupCommand),
+                    ("reason", "pickup_gone_or_timeout"));
+                ClearEquipmentPickup();
+                return false;
+            }
+            Vector3 direction = equipmentPickupTarget.transform.position - body.transform.position;
+            direction.y = 0f;
+            body.inputBank.moveVector = navigationController.ApplyJumpDetection(body, direction.normalized);
+            FireWhileTravelling(body);
+            return true;
+        }
+
         /// <summary>True while steering onto a dropped item; the caller skips all other logic.</summary>
         private bool TryPickupReflex(CharacterBody body)
         {
-            bool safe = entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE) == 0;
-            if (pickupReflexTarget == null && safe && Time.frameCount % 15 == 0)
+            bool emptyEquipmentSlot = !body.inventory
+                || body.inventory.currentEquipmentIndex == EquipmentIndex.None;
+            if (pickupReflexTarget == null && Time.frameCount % 15 == 0)
             {
                 float range = Time.time < lootWatchUntil ? LOOT_WATCH_RANGE : PICKUP_REFLEX_RANGE;
-                GameObject p = entityDetector.FindNearestPickup(range: range);
+                GameObject p = entityDetector.FindNearestPickup(
+                    range: range, includeEquipment: emptyEquipmentSlot);
                 var ctrl = p != null ? p.GetComponent<GenericPickupController>() : null;
                 PickupDef def = ctrl != null ? PickupCatalog.GetPickupDef(ctrl.pickupIndex) : null;
-                if (def != null && def.equipmentIndex == EquipmentIndex.None)
+                if (def != null && (def.equipmentIndex == EquipmentIndex.None || emptyEquipmentSlot))
                 {
                     pickupReflexTarget = p;
                     pickupReflexUntil = Time.time + PICKUP_REFLEX_S;
@@ -1021,7 +1095,16 @@ namespace Rainflayer
             }
             if (pickupReflexTarget == null)
                 return false;
-            if (!safe || Time.time > pickupReflexUntil || !pickupReflexTarget
+            var activePickup = pickupReflexTarget.GetComponent<GenericPickupController>();
+            var activeDef = activePickup != null
+                ? PickupCatalog.GetPickupDef(activePickup.pickupIndex) : null;
+            if (activeDef != null && activeDef.equipmentIndex != EquipmentIndex.None
+                && !emptyEquipmentSlot)
+            {
+                pickupReflexTarget = null; // The slot filled while pursuing this drop.
+                return false;
+            }
+            if (Time.time > pickupReflexUntil || !pickupReflexTarget
                 || !pickupReflexTarget.activeInHierarchy)
             {
                 pickupReflexTarget = null;       // taken, gone, timed out, or a fight started
@@ -1209,14 +1292,25 @@ namespace Rainflayer
                     return; // Don't do other AI behavior until we've exited drop pod
                 }
 
+                // A JEV-authorized equipment replacement owns movement until collected or timed out.
+                if (HandleEquipmentPickup(body))
+                    return;
+
                 // === ROR-JEV (build 10): ITEM PICKUP REFLEX ===
                 // jev-05: a chest opened and its item stayed on the ground all run. The pickup
                 // below works by setting the nav target, which every JEV command overwrites
                 // within seconds. Taking an item is never a decision, so this steers straight
                 // onto it FIRST and returns, for at most PICKUP_REFLEX_S. Equipment is left alone:
                 // taking it swaps the equipment carried, which is a decision.
-                if (entityDetector != null && TryPickupReflex(body))
+                if (entityDetector != null
+                    && navigationController.GetInteractionTarget() == null
+                    && (navigationController.gotoInteractable == null
+                        || navigationController.gotoInteractable.Type != "entity")
+                    && TryPickupReflex(body))
+                {
+                    FireWhileTravelling(body);
                     return;
+                }
 
                 // === ROR-JEV (build 14): FREE BARREL IN PASSING ===
                 // jev-05..jev-09: the character kept running past barrels. They cost nothing, so
@@ -1258,7 +1352,8 @@ namespace Rainflayer
                         // Check periodically (every 2 seconds = 120 frames)
                         if (Time.frameCount % 120 == 0)
                         {
-                            GameObject nearestPickup = entityDetector.FindNearestPickup(range: 30f);
+                            GameObject nearestPickup = entityDetector.FindNearestPickup(
+                                range: 30f, includeEquipment: false);
 
                             if (nearestPickup != null)
                             {
@@ -1326,22 +1421,13 @@ namespace Rainflayer
                 // === EVENT TRACKING ===
                 TrackEvents(body);
 
-                // === COMBAT PRIORITY OVER LOOTING ===
-                // If enemies appear nearby while interacting, cancel and fight
-                if (navigationController.GetInteractionTarget() != null && entityDetector != null)
-                {
-                    int nearbyEnemies = entityDetector.CountEnemiesInRange(COMBAT_PRIORITY_RANGE);
-                    if (nearbyEnemies > 0)
-                    {
-                        Log($"[COMBAT PRIORITY] Interrupting interaction - {nearbyEnemies} enemies nearby");
-                        navigationController.ClearInteractionTarget();
-                    }
-                }
-
                 // === INTERACTION HOLDING ===
                 if (navigationController.GetInteractionTarget() != null)
                 {
                     navigationController.HandleInteractionHolding(body);
+                    // Opening a chest is a brief committed action. Keep shooting, but never
+                    // discard the interaction merely because an enemy moved nearby.
+                    FireWhileTravelling(body);
                     // Detect completion this frame (lastInteractionSucceeded is reset each call,
                     // so it's only true on the exact frame OnInteractionBegin fires)
                     if (navigationController.lastInteractionSucceeded)

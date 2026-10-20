@@ -1545,6 +1545,64 @@ now fire. The deviation from the registry table is deliberate and recorded here.
 
 ---
 
+### F59 — Releasing the Python task did not stop the character's walk
+
+`jev-17` contains eight fallback task releases (six stalled walks, one timed-out walk,
+one timed-out interaction), but no `GOTO cancel` command. `MODE roam` and `MODE combat`
+do not clear an active `GOTO_ID`/`INTERACT_ID` in `AIController.HandleModeCommand`.
+Consequently the brain could report exploring while the mod kept following the old target.
+The recording alone cannot establish how long each abandoned navigation persisted.
+
+The loop now sends `GOTO cancel` and requires its successful command response before
+releasing a task inferred to have ended or redirecting a walk. Missing acknowledgement
+keeps the slot occupied. Repeated, authorized JEV choices to explore or fight can now
+redirect a walk too; previously both were excluded. A replacement that fails its probability
+or worth gate cannot trigger a redirect. Safety-origin commands only cancel existing work.
+
+All 605 recorded requests also said `control.active_action: null`, even when offering
+`continue_current_action`. Requests now name and describe the real task. Navigation progress
+remains unknown, so this does not enable the separate `continue_is_worthwhile` question.
+
+### F60 — Sorting objects renamed the teleporter
+
+`jev-17` explicitly records a redirect from `GOTO_ID:teleporter` to
+`navigate:teleporter-0`: the active action had been named `navigate:teleporter-1`.
+Those names came from distance sorting, not different objects. The adapter now uses the
+scene-local singleton ID `teleporter`; scene changes clear suppression and quarantine state.
+
+### F61 — Build identity compared an integer with a string
+
+Recorded `mod_build` is a JSON integer, while the loop expected the string `"18"`, causing a
+warning even for the matching build. The expected value is now numeric. Build 19 includes
+the already committed but previously unbuilt `interactables.unseen` field. DLL comparison
+against installed build 18 changes only `Observation.Build` and `Observation.Interactables`.
+This prepares better telemetry; it does not establish improved sight or stage completion.
+
+### F62 — Nearby enemies cancelled an authorized chest interaction
+
+`jev-18` cleared Stage 1 and entered Wetland Aspect, the first stage completion in 18 JEV runs.
+Late in the run, an enemy within 10 m caused `AIController.FixedUpdateAI` to call
+`ClearInteractionTarget()` before the interaction handler ran. This discarded an already
+authorized chest action even though opening a chest is a short button press and combat can
+continue at the same time.
+
+Build 20 removes that combat-priority cancellation. While any authorized interaction is in
+progress, the mod retains interaction movement and input while aiming and firing at nearby
+enemies. Ordinary item pickup similarly keeps firing and is no longer abandoned merely because
+an enemy is close. JEV still decides whether to spend the gold and start the interaction.
+
+### F63 — JEV could open an equipment barrel but could not see its drop
+
+At tick 864 of `jev-18`, JEV chose `open_equipment_barrel:equipment_barrel@-258200` with 0.75
+probability. The interaction completed, but every later request still showed an empty equipment
+slot and no ground equipment fact. JEV then chose `explore`; it did not make an informed choice
+to leave the equipment.
+
+Build 20 takes ground equipment automatically when the slot is empty, because nothing is being
+replaced. If equipment is already carried, nearby drops appear as named `take_equipment` options
+that state both effects. Only a JEV-authorized `PICKUP_ID` may replace carried equipment; choosing
+another action leaves the drop deliberately. Identical replacements are omitted.
+
 ## §4 Pinned build (step 3)
 
 Full record in `contract/pinned-build.yaml`.

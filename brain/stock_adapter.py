@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from .build_identity import derive as derive_identity
 from .catalog import UNKNOWN
 from .enemy_class import band_threat
-from .equipment import band as band_equipment
+from .equipment import band as band_equipment, describe as describe_equipment
 from .interactable_type import REGISTRY_TYPE, classify as classify_prefab, shop_item_name
 from .build_identity import describe_item, effects as item_effects
 
@@ -199,7 +199,8 @@ def _left_here_band(cands: list[dict]) -> str:
     The teleporter is not one of them -- it is the way out, not something to spend time on, and
     counting it meant this never read `nothing`.
     """
-    n = sum(1 for c in cands if c.get("cost_band") in ("affordable", "free")
+    n = sum(1 for c in cands if c.get("type") != "equipment_pickup"
+            and c.get("cost_band") in ("affordable", "free")
             and not str(c.get("type", "")).startswith("teleporter"))
     return _count_band(n)
 
@@ -208,7 +209,7 @@ def _unopened_here_band(cands: list[dict]) -> str:
     """Everything still unopened here, affordable or not (jev-12: at stage start the character
     is broke, so "nothing affordable" read as "this stage is finished" and JEV went straight for
     the teleporter)."""
-    return _count_band(sum(1 for c in cands
+    return _count_band(sum(1 for c in cands if c.get("type") != "equipment_pickup"
                            if not str(c.get("type", "")).startswith("teleporter")))
 
 
@@ -387,7 +388,9 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
         if mapped.startswith("teleporter"):
             tp_found = True
         dist = num(it.get("distance"), 1e9)
-        eid = f"{mapped.split('_')[0]}-{idx}"       # synthetic, positional, NOT stable
+        # There is one teleporter per scene. Its identity must survive distance sorting:
+        # jev-17 redirected a walk from teleporter-1 to teleporter-0 (the same object).
+        eid = "teleporter" if mapped.startswith("teleporter") else f"{mapped.split('_')[0]}-{idx}"
         in_range = dist is not None and dist <= range_m
         ilist.append({
             "entity_id": eid, "type": mapped, "display_name": it.get("name"),
@@ -443,6 +446,31 @@ def adapt(objective: dict, inventory: dict, combat: dict, interactables: dict,
                              if "shop_hidden" in it else {}),
                           "cost_band": _cost_band(cost, it.get("cost_type"), gold),
                           "distance_band": _nearest_band(dist), "reachable": True})
+
+    # Build 20+: equipment drops are choices only when taking one would replace carried
+    # equipment. The mod reflexively takes them when the slot is empty.
+    drops = (observation or {}).get("equipment_pickups")
+    carried = ((observation or {}).get("self") or {}).get("equipment") or {}
+    carried_name = str(carried.get("name") or "")
+    if isinstance(drops, list) and carried_name:
+        for drop in drops:
+            dist = num(drop.get("distance"), 1e9)
+            eid = f"equipment_pickup@{drop.get('id')}"
+            name = str(drop.get("name") or "")
+            if name and name == carried_name:
+                continue  # swapping an equipment for the identical equipment has no benefit
+            ilist.append({
+                "entity_id": eid, "type": "equipment_pickup", "kind": "equipment_pickup",
+                "display_name": drop.get("display"), "item": name, "affordable": True,
+                "cost": 0, "cost_type": "none", "locked": False, "distance": dist,
+                "in_interaction_range": True, "opportunity_token": None,
+                "path_reachable": True, "reachability_age_ms": UNKNOWN,
+            })
+            cands.append({
+                "id": eid, "type": "equipment_pickup", "kind": "equipment_pickup",
+                "item": describe_equipment(name), "cost_band": "free",
+                "distance_band": _nearest_band(dist), "reachable": True,
+            })
 
     out.raw = {
         "type": "OBSERVATION", "observation_id": observation_id, "seq": seq,

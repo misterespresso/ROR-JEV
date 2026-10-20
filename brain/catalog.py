@@ -201,8 +201,10 @@ def _option_vars(rec: ActionRecord, state: dict) -> dict:
                 target = f"the {kind} selling {item} ({band}, {dist})"
             else:
                 target = f"the {kind} ({band}, {dist})"
+    carried = state.get("self", {}).get("equipment") or {}
+    carried = carried.get("what_it_does") or carried.get("name") or "an empty equipment slot"
     return {"cost_band": band, "entity_id": rec.args.get("target_id", ""), "target": target,
-            "item": item}
+            "item": item, "carried_equipment": carried}
 
 
 def _render_worth_gates(payload: dict, registry: dict[str, ActionRecord]) -> dict:

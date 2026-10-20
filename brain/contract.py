@@ -60,6 +60,9 @@ COMMAND_SPECS: dict[str, CommandSpec] = {
     "INTERACT_TARGET": CommandSpec(
         "INTERACT_TARGET", True, "effect applied, or pre-effect validation failed", 5_000
     ),
+    "PICKUP_TARGET": CommandSpec(
+        "PICKUP_TARGET", True, "named equipment collected, gone, or deadline", 12_000
+    ),
     "SEARCH": CommandSpec(
         "SEARCH", True, "target discovered, search segment exhausted, or deadline", 45_000
     ),

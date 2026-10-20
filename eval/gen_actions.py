@@ -70,7 +70,8 @@ def main() -> int:
             return 1
         print("contract/actions.yaml up to date")
         return 0
-    path.write_text(new, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(new)
     print(f"wrote {path}")
     return 0
 

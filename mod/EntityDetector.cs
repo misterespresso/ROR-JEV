@@ -1972,7 +1972,7 @@ namespace Rainflayer
         /// Uses GenericPickupController (RoR2 API) to detect items on the ground.
         /// Similar to AutoPlay's FindItemPickup() implementation.
         /// </summary>
-        public GameObject FindNearestPickup(float range = 30f)
+        public GameObject FindNearestPickup(float range = 30f, bool includeEquipment = true)
         {
             CharacterBody body = GetBody();
             if (body == null)
@@ -2006,6 +2006,9 @@ namespace Rainflayer
                         // Use PickupDef.coinValue instead (RoR2's canonical way to identify lunar coins)
                         PickupDef pickupDef = PickupCatalog.GetPickupDef(pickup.pickupIndex);
                         if (pickupDef != null && pickupDef.coinValue > 0)
+                            continue;
+                        if (!includeEquipment && pickupDef != null
+                            && pickupDef.equipmentIndex != EquipmentIndex.None)
                             continue;
 
                         float distance = Vector3.Distance(body.transform.position, pickup.transform.position);

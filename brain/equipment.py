@@ -44,6 +44,13 @@ EQUIPMENT: dict[str, tuple[str, str]] = {
     "QuestVolatileBattery": ("Fuel Array: explodes when health gets low; do not trigger", "never"),
 }
 
+
+def describe(name: str | None) -> str:
+    """Human-readable equipment name and effect for a JEV choice."""
+    key = str(name or "")
+    what = EQUIPMENT.get(key, ("", ""))[0]
+    return what or (key if key else "unknown equipment")
+
 #: An equipment that works on enemies needs one this close to have a target.
 ENEMY_RANGE_M = 30.0
 
